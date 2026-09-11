@@ -1,0 +1,5 @@
+cinema_app
+cinema_app.exe
+*.o
+*.out
+.vscode/
