@@ -1,5 +1,5 @@
 ### 1. Khởi động (Startup)
-
+```
   ./main
     │
     └──► main()
@@ -47,3 +47,5 @@ xác định vị trí code -> KHAI BÁO NGUYÊN MẪU (PROTOTYPES): vd: void nh
                         │
                         ▼
 [Lưu lại]  ──► ghiToanBoFile() (Quét sạch RAM ghi đè lại toàn bộ xuống DB) -> nhớ lưu lại vào db, có hàm vét linklist để lưu ghiToanBoFile;
+
+```

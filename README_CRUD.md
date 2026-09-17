@@ -36,22 +36,6 @@ headPhim ──→ [NodePhim] ──→ [NodePhim] ──→ ... ──→ nullp
             }                  }
 ```
 
-### Tổ chức file mã nguồn (đề xuất khi mở rộng)
-
-```
-movie_booking/
-├── main.cpp              ← Hàm main + menu + điều phối
-├── structs.h             ← Khai báo struct (MaVe, ThongTinGhe, Phim, NodePhim)
-├── linkedlist.h/.cpp     ← Các thao tác Linked List (thêm, xóa, tìm, sắp xếp)
-├── file_io.h/.cpp        ← Đọc / ghi file database
-├── display.h/.cpp        ← Hiển thị bảng, sơ đồ ghế
-├── validation.h/.cpp     ← Kiểm tra dữ liệu đầu vào
-├── cinema_db.txt         ← File database
-└── README_CRUD.md        ← Tài liệu này
-```
-
-> **Hiện tại** tất cả đang gộp trong `main.cpp`. Khi chức năng nhiều lên, hãy tách file theo cấu trúc trên. Mỗi file `.h/.cpp` là một **module** độc lập, `main.cpp` chỉ gọi hàm.
-
 ### Bảng kê hàm — mapping chức năng → hàm
 
 | # | Chức năng | Tên hàm | Trạng thái |
