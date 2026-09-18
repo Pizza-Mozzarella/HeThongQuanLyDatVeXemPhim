@@ -180,20 +180,130 @@ void xemDanhSachPhim(NodePhim* headPhim) {
         }
     printf("%s\n", string(72, '=').c_str());
 }
+// CHỨC NĂNG 6: CẬP NHẬT THÔNG TIN PHIM (Theo mã phim)
+void capNhatThongTinPhim(NodePhim* headPhim) {
+    string ma;
+    cout << "\n--- CAP NHAT THONG TIN PHIM ---\n";
+    cout << "Nhap ma phim can cap nhat (vd: P01): ";
+    cin >> ma;
 
-// ----------------------------------------------------------------
+    NodePhim* p = headPhim;
+    while (p != nullptr) {
+        if (p->data.ma == ma) {
+            cout << "Da tim thay phim: " << p->data.ten << "\n";
+            cout << "Nhap ten phim moi: ";
+            cin.ignore();
+            getline(cin, p->data.ten);
+            cout << "Nhap the loai moi: ";
+            getline(cin, p->data.theLoai);
+            cout << "Nhap thoi luong moi (phut): ";
+            cin >> p->data.thoiLuong;
+            cout << "Nhap gia ve moi: ";
+            cin >> p->data.giaVe;
+            cout << "=> Cap nhat thong tin phim thanh cong!\n";
+            return;
+        }
+        p = p->next;
+    }
+    cout << "=> Khong tim thay phim co ma: " << ma << "\n";
+}
+// CHỨC NĂNG 7: SẮP XẾP DANH SÁCH PHIM (Giá vé & Thời lượng)
+void sapXepTheoGiaVe(NodePhim* headPhim, bool giamDan) {
+    if (headPhim == nullptr || headPhim->next == nullptr) return;
 
+    bool swapped;
+    NodePhim* ptr1;
+    NodePhim* lptr = nullptr;
 
+    do {
+        swapped = false;
+        ptr1 = headPhim;
 
+        while (ptr1->next != lptr) {
+            bool dieuKienDoi = giamDan ? (ptr1->data.giaVe < ptr1->next->data.giaVe)
+                                       : (ptr1->data.giaVe > ptr1->next->data.giaVe);
 
+            if (dieuKienDoi) {
+                Phim temp = ptr1->data;
+                ptr1->data = ptr1->next->data;
+                ptr1->next->data = temp;
+                swapped = true;
+            }
+            ptr1 = ptr1->next;
+        }
+        lptr = ptr1;
+    } while (swapped);
+}
 
+void sapXepTheoThoiLuong(NodePhim* headPhim, bool giamDan) {
+    if (headPhim == nullptr || headPhim->next == nullptr) return;
+
+    bool swapped;
+    NodePhim* ptr1;
+    NodePhim* lptr = nullptr;
+
+    do {
+        swapped = false;
+        ptr1 = headPhim;
+
+        while (ptr1->next != lptr) {
+            bool dieuKienDoi = giamDan ? (ptr1->data.thoiLuong < ptr1->next->data.thoiLuong)
+                                       : (ptr1->data.thoiLuong > ptr1->next->data.thoiLuong);
+
+            if (dieuKienDoi) {
+                Phim temp = ptr1->data;
+                ptr1->data = ptr1->next->data;
+                ptr1->next->data = temp;
+                swapped = true;
+            }
+            ptr1 = ptr1->next;
+        }
+        lptr = ptr1;
+    } while (swapped);
+}
+
+void hienThiMenuSapXep(NodePhim* headPhim) {
+    if (headPhim == nullptr) {
+        cout << "Danh sach phim trống!\n";
+        return;
+    }
+    cout << "\n--- SAP XEP DANH SACH PHIM ---\n";
+    cout << "1. Gia ve tang dan (Thap -> Cao)\n";
+    cout << "2. Gia ve giam dan (Cao -> Thap)\n";
+    cout << "3. Thoi luong tang dan (Ngan -> Dai)\n";
+    cout << "4. Thoi luong giam dan (Dai -> Ngan)\n";
+    cout << "Chon tuy chon (1-4): ";
+    string luaChon;
+    cin >> luaChon;
+
+    if (luaChon == "1") {
+        sapXepTheoGiaVe(headPhim, false);
+        cout << "=> Đã sắp xếp theo giá vé TĂNG DẦN thành công!\n";
+        xemDanhSachPhim(headPhim);
+    } else if (luaChon == "2") {
+        sapXepTheoGiaVe(headPhim, true);
+        cout << "=> Đã sắp xếp theo giá vé GIẢM DẦN thành công!\n";
+        xemDanhSachPhim(headPhim);
+    } else if (luaChon == "3") {
+        sapXepTheoThoiLuong(headPhim, false);
+        cout << "=> Đã sắp xếp theo thời lượng TĂNG DẦN thành công!\n";
+        xemDanhSachPhim(headPhim);
+    } else if (luaChon == "4") {
+        sapXepTheoThoiLuong(headPhim, true);
+        cout << "=> Đã sắp xếp theo thời lượng GIẢM DẦN thành công!\n";
+        xemDanhSachPhim(headPhim);
+    } else {
+        cout << "=> Tuy chon khong hop le!\n";
+    }
+}
 // ================================================================
 // MAIN
 // ================================================================
-
 void hienThiMenu() {
     cout << "\n===== QUAN LY DAT VE XEM PHIM =====\n";
     cout << "  1. Xem danh sach phim\n";
+    cout << "  6. Cap nhat thong tin phim\n";
+    cout << "  7. Sap xep danh sach phim\n";
     cout << "  0. Thoat\n";
     cout << "====================================\n";
     cout << "Chon: ";
@@ -221,6 +331,10 @@ int main() {
 
         if (chon == "1") {
             xemDanhSachPhim(headPhim);
+        } else if (chon == "6") {
+            capNhatThongTinPhim(headPhim);
+        } else if (chon == "7") {
+            hienThiMenuSapXep(headPhim);
         } else if (chon == "0") {
             ghiToanBoFile(FILE_DB, headPhim);
             cout << "Da luu du lieu. Tam biet!\n";
