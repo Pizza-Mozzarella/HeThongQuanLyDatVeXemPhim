@@ -362,6 +362,110 @@ void xemDanhSachPhim(NodePhim* headPhim) {
 }
 
 // ================================================================
+// CHỨC NĂNG 4: TIM PHIM
+// ================================================================
+bool check_TimKiem(NodePhim* p, string maCanTim, string tenCanTim, double giaMin, double giaMax) {
+    string maPhim = p->data.ma;
+    string tenPhim = p->data.ten;
+    
+    // Chuyen du lieu trong node ve chu thuong de so sanh
+    for (char &c : maPhim) c = tolower(c);
+    for (char &c : tenPhim) c = tolower(c);
+
+    // Kiem tra dieu kien: neu nguoi dung nhap rong thi bo qua dieu kien do
+    bool khopMa = (maCanTim != "" && maPhim.find(maCanTim) != string::npos);
+    bool khopTen = (tenCanTim != "" && tenPhim.find(tenCanTim) != string::npos);
+    bool khopGia = (giaMin >= 0 && giaMax > giaMin)   &&   (p->data.giaVe >= giaMin && p->data.giaVe <= giaMax);
+
+    // Neu thoa man tat ca dieu kien
+    if (khopMa || khopTen || khopGia) {
+        return true;
+    }
+    return false;
+}
+
+void DanhSach_TimKiem(NodePhim* head, string maCanTim, string tenCanTim, double giaMin, double giaMax) {
+    for (char &c : maCanTim)  c = tolower(c);
+    for (char &c : tenCanTim) c = tolower(c);
+
+    int dem = 0;
+    NodePhim* p = head;
+    while (p != nullptr) {
+        if (check_TimKiem(p, maCanTim, tenCanTim, giaMin, giaMax)) {
+            if (dem == 0) {
+                printf("\n%-8s %-30s %-15s %-12s %s\n",
+                    "Ma", "Ten Phim", "The Loai", "Thoi Luong", "Gia Ve");
+                printf("%s\n", string(72, '-').c_str());
+            }
+            printf("%-8s %-30s %-15s %-9d %s  %.0f VND\n",
+                p->data.ma.c_str(),
+                p->data.ten.c_str(),
+                p->data.theLoai.c_str(),
+                p->data.thoiLuong,
+                "phut",
+                p->data.giaVe);
+            dem++;
+        }
+        p = p->next;
+    }
+
+    if (dem == 0){
+        cout << "[!] Khong tim thay phim nao thoa man tieu chi!\n";
+    }
+    else {
+        cout << "\n=> Tim thay " << dem << " phim.\n";
+    }
+}
+
+// ================================================================
+// CHỨC NĂNG 5: XOA PHIM
+// ================================================================
+bool KhopPhim(NodePhim* node, string MaCanXoa, string TenCanXoa) {
+    string ma  = node->data.ma;
+    string ten = node->data.ten;
+    for (char &c : ma)  c = tolower(c);
+    for (char &c : ten) c = tolower(c);
+
+    bool maProvided  = !MaCanXoa.empty(); // kiem tra chui rong
+    bool tenProvided = !TenCanXoa.empty();
+
+    // Khong nhap gi -> khong xoa
+    if (!maProvided && !tenProvided) return false;
+
+    bool khopMa  = maProvided  && (ma.find(MaCanXoa)  != string::npos);
+    bool khopTen = tenProvided && (ten.find(TenCanXoa) != string::npos);
+
+    return khopMa || khopTen; // Khop ma HOAC ten la du
+}
+
+NodePhim* XoaPhim(NodePhim* &head, string MaCanXoa, string TenCanXoa) {
+    if (head == nullptr) return nullptr;
+
+    for (char &c : MaCanXoa) c = tolower(c);
+    for (char &c : TenCanXoa) c = tolower(c);
+
+    // Truong hop 1: Node dau tien khop
+    if (KhopPhim(head, MaCanXoa, TenCanXoa)) {
+        NodePhim* del = head;
+        head = head->next;   // Dich head sang node tiep theo
+        return del;
+    }
+
+    // Truong hop 2: Tim trong phan con lai
+    NodePhim* p = head;
+    while (p->next != nullptr) {
+        if (KhopPhim(p->next, MaCanXoa, TenCanXoa)) {
+            NodePhim* del = p->next;
+            p->next = del->next;  // Noi lai linked list, bo qua node bi xoa
+            return del;
+        }
+        p = p->next;
+    }
+
+    return nullptr; // Khong tim thay
+}
+
+// ================================================================
 // CHỨC NĂNG 6: CẬP NHẬT THÔNG TIN PHIM
 // ================================================================
 void capNhatThongTinPhim(NodePhim* headPhim) {
