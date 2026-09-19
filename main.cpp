@@ -687,7 +687,7 @@ int main() {
             NodePhim* kq = XoaPhim(headPhim, MaCanXoa, TenCanXoa);
 
             // in KQ
-            cout << "\n--- DA XOA ---\n";
+            cout << "\n======== KET QUA ========\n";
             if (kq != nullptr) {
                 printf("\n%-8s %-30s %-15s %-12s %s\n", 
                     "Ma", "Ten Phim", "The Loai", "Thoi Luong", "Gia Ve");
