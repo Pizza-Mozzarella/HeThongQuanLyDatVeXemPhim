@@ -462,136 +462,189 @@ NodePhim* XoaPhim(NodePhim* &head, string MaCanXoa, string TenCanXoa) {
 
     return nullptr; // Khong tim thay
 }
-
 // ================================================================
-// CHỨC NĂNG 6: CẬP NHẬT THÔNG TIN PHIM
+// CHỨC NĂNG 6: CẬP NHẬT THÔNG TIN PHIM (LINH HOẠT TÙY CHỌN TỪNG MỤC)
+// ================================================================
+// NGHIỆP VỤ:
+// 1. Tìm kiếm bộ phim cần điều chỉnh dựa trên Mã phim (Khóa chính - Primary Key).
+// 2. In ra màn hình toàn bộ thông tin hiện tại của phim để nhân viên dễ dàng đối chiếu.
 // ================================================================
 void capNhatThongTinPhim(NodePhim* headPhim) {
     string ma;
     cout << "\n--- CAP NHAT THONG TIN PHIM ---\n";
-    cout << "Nhap ma phim can cap nhat (vd: P01): ";
-    cin >> ma;
+    cout << "Huong dan: Nhap '0' neu muon huy thao tac.\n";
+    
+    // Bước 1: Lấy mã định danh phim cần sửa
+    ma = nhapChuoi("Nhap ma phim can cap nhat (VD: P01): ");
+    if (ma == "0") {
+        cout << "=> Da huy thao tac cap nhat.\n";
+        return;
+    }
 
+    // Bước 2: Duyệt danh sách liên kết trên RAM để tìm kiếm
     NodePhim* p = headPhim;
     while (p != nullptr) {
         if (p->data.ma == ma) {
-            cout << "Da tim thay phim: " << p->data.ten << "\n";
-            cout << "Nhap ten phim moi: ";
-            cin.ignore();
-            getline(cin, p->data.ten);
-            cout << "Nhap the loai moi: ";
-            getline(cin, p->data.theLoai);
-            cout << "Nhap thoi luong moi (phut): ";
-            cin >> p->data.thoiLuong;
-            cout << "Nhap gia ve moi: ";
-            cin >> p->data.giaVe;
+            // Hiển thị thông tin hiện tại để nhân viên kiểm tra trước khi sửa
+            cout << "\n[Thong tin phim hien tai]\n";
+            cout << "- Ten phim     : " << p->data.ten << "\n";
+            cout << "- The loai     : " << p->data.theLoai << "\n";
+            cout << "- Thoi luong   : " << p->data.thoiLuong << " phut\n";
+            cout << "- Gia ve       : " << p->data.giaVe << " VND\n";
+            cout << "----------------------------------------\n";
+            cout << "Ban co muon thay doi cac thong tin sau khong? (Nhap y/n)\n";
+
+            bool coThayDoi = false;
+            string traLoi;
+
+            // Bước 3: Lần lượt hỏi từng thuộc tính (Nhân viên có thể chọn sửa riêng lẻ tùy ý)
             
-            // Đồng bộ xuống file ngay sau khi cập nhật thành công
-            ghiToanBoFile(FILE_DB, headPhim);
-            cout << "=> Cap nhat thong tin phim va dong bo file thanh cong!\n";
-            return;
+            // 3.1. Cập nhật Tên phim (Tùy chọn)
+            cout << "-> Doi ten phim moi? (y/n): ";
+            getline(cin, traLoi);
+            if (traLoi == "y" || traLoi == "Y") {
+                p->data.ten = nhapChuoi("   Nhap ten phim moi: ");
+                coThayDoi = true;
+            }
+
+            // 3.2. Cập nhật Thể loại (Tùy chọn)
+            cout << "-> Doi the loai moi? (y/n): ";
+            getline(cin, traLoi);
+            if (traLoi == "y" || traLoi == "Y") {
+                p->data.theLoai = nhapChuoi("   Nhap the loai moi: ");
+                coThayDoi = true;
+            }
+
+            // 3.3. Cập nhật Thời lượng (Tùy chọn - Có validation từ 15 đến 360 phút)
+            cout << "-> Doi thoi luong moi? (y/n): ";
+            getline(cin, traLoi);
+            if (traLoi == "y" || traLoi == "Y") {
+                p->data.thoiLuong = nhapSoNguyen("   Nhap thoi luong moi (15 - 360 phut): ", 15, 360);
+                coThayDoi = true;
+            }
+
+            // 3.4. Cập nhật Giá vé (Tùy chọn - Có validation biên độ tiền vé hợp lệ)
+            cout << "-> Doi gia ve moi? (y/n): ";
+            getline(cin, traLoi);
+            if (traLoi == "y" || traLoi == "Y") {
+                p->data.giaVe = nhapSoThuc("   Nhap gia ve moi (10,000 - 1,000,000 VND): ", 10000, 1000000);
+                coThayDoi = true;
+            }
+
+            // Bước 4: Kiểm tra và tiến hành đồng bộ nếu có phát sinh thay đổi
+            if (coThayDoi) {
+                // ĐỒNG BỘ DỮ LIỆU: Ghi đè RAM xuống file text ngay lập tức
+                ghiToanBoFile(FILE_DB, headPhim);
+                cout << "=> [Thanh cong] Cap nhat thong tin va DONG BO file thanh cong!\n";
+            } else {
+                cout << "=> Khong có thong tin nao bi thay doi.\n";
+            }
+            return; // Thoát hàm sau khi hoàn tất xử lý phim tìm thấy
         }
         p = p->next;
     }
-    cout << "=> Khong tim thay phim co ma: " << ma << "\n";
-}
 
+    // Trường hợp quét hết danh sách không khớp mã phim nào
+    cout << "=> [!] Khong tim thay phim co ma: " << ma << "\n";
+}
 // ================================================================
 // CHỨC NĂNG 7: SẮP XẾP DANH SÁCH PHIM (Giá vé & Thời lượng)
 // ================================================================
-void sapXepTheoGiaVe(NodePhim* headPhim, bool giamDan) {
-    if (headPhim == nullptr || headPhim->next == nullptr) return;
+// NGHIỆP VỤ:
+// Cung cấp Menu điều phối trực quan giúp người quản lý rạp dễ dàng lựa chọn 
+//    tiêu chí sắp xếp danh sách phim theo mong muốn:
+//    - Theo Giá vé (Tăng dần từ thấp đến cao hoặc Giảm dần từ cao xuống thấp).
+//    - Theo Thời lượng (Tăng dần từ ngắn đến dài hoặc Giảm dần từ dài xuống ngắn).
+// Hàm cốt lõi: Thuật toán sắp xếp danh sách liên kết đơn tổng quát
+void sapXepDanhSachPhim(NodePhim*& head, bool giamDan, bool laGiaVe) {
+    // Kiểm tra biên: Nếu danh sách rỗng hoặc chỉ có đúng 1 phim thì không cần sắp xếp
+    if (head == nullptr || head->next == nullptr) return;
 
     bool swapped;
     NodePhim* ptr1;
-    NodePhim* lptr = nullptr;
+    NodePhim* lptr = nullptr; // Con trỏ biên giới hạn vùng chưa sắp xếp, giúp tối ưu số lần duyệt thừa cho Linked List
 
     do {
         swapped = false;
-        ptr1 = headPhim;
+        ptr1 = head;
 
         while (ptr1->next != lptr) {
-            bool dieuKienDoi = giamDan ? (ptr1->data.giaVe < ptr1->next->data.giaVe)
-                                       : (ptr1->data.giaVe > ptr1->next->data.giaVe);
+            NodePhim* ptr2 = ptr1->next;
+            
+            // Lấy giá trị dữ liệu tương ứng để so sánh dựa vào cờ hiệu cấu hình (`laGiaVe`)
+            double val1 = laGiaVe ? ptr1->data.giaVe : ptr1->data.thoiLuong;
+            double val2 = laGiaVe ? ptr2->data.giaVe : ptr2->data.thoiLuong;
+
+            // Xác định điều kiện đổi chỗ dựa theo chiều tăng dần hay giảm dần (`giamDan`)
+            bool dieuKienDoi = giamDan ? (val1 < val2) : (val1 > val2);
 
             if (dieuKienDoi) {
+                // Hoán đổi phần dữ liệu cấu trúc (data) giữa 2 node liên tiếp
                 Phim temp = ptr1->data;
-                ptr1->data = ptr1->next->data;
-                ptr1->next->data = temp;
+                ptr1->data = ptr2->data;
+                ptr2->data = temp;
                 swapped = true;
             }
             ptr1 = ptr1->next;
         }
-        lptr = ptr1;
+        lptr = ptr1; // Thu hẹp phạm vi quét qua mỗi vòng lặp hoàn thành
     } while (swapped);
 }
 
-void sapXepTheoThoiLuong(NodePhim* headPhim, bool giamDan) {
-    if (headPhim == nullptr || headPhim->next == nullptr) return;
-
-    bool swapped;
-    NodePhim* ptr1;
-    NodePhim* lptr = nullptr;
-
-    do {
-        swapped = false;
-        ptr1 = headPhim;
-
-        while (ptr1->next != lptr) {
-            bool dieuKienDoi = giamDan ? (ptr1->data.thoiLuong < ptr1->next->data.thoiLuong)
-                                       : (ptr1->data.thoiLuong > ptr1->next->data.thoiLuong);
-
-            if (dieuKienDoi) {
-                Phim temp = ptr1->data;
-                ptr1->data = ptr1->next->data;
-                ptr1->next->data = temp;
-                swapped = true;
-            }
-            ptr1 = ptr1->next;
-        }
-        lptr = ptr1;
-    } while (swapped);
-}
-
+// Hàm điều phối giao diện Menu lựa chọn sắp xếp cho người dùng
 void hienThiMenuSapXep(NodePhim* headPhim) {
+    // Kiểm tra dữ liệu đầu vào trước khi mở menu
     if (headPhim == nullptr) {
-        cout << "Danh sach phim trống!\n";
+        cout << "[!] Danh sach phim hien dang trong, chua co du lieu de sap xep!\n";
         return;
     }
+    
     cout << "\n--- SAP XEP DANH SACH PHIM ---\n";
     cout << "1. Gia ve tang dan (Thap -> Cao)\n";
     cout << "2. Gia ve giam dan (Cao -> Thap)\n";
     cout << "3. Thoi luong tang dan (Ngan -> Dai)\n";
     cout << "4. Thoi luong giam dan (Dai -> Ngan)\n";
-    cout << "Chon tuy chon (1-4): ";
+    cout << "0. Quay lai menu chinh\n";
+    cout << "Chon tuy chon (0-4): ";
+    
     string luaChon;
     cin >> luaChon;
+    cin.ignore(); // Xử lý trôi lệnh ký tự Enter sau khi nhập lựa chọn dạng chuỗi
 
+    // Nghiệp vụ hủy nhanh hoặc quay về menu chính
+    if (luaChon == "0") {
+        cout << "=> Tro ve menu chinh.\n";
+        return;
+    }
+
+    bool daXuLy = true;
     if (luaChon == "1") {
-        sapXepTheoGiaVe(headPhim, false);
+        sapXepDanhSachPhim(headPhim, false, true);  // Sắp xếp TĂNG DẦN theo Giá vé
+    } 
+    else if (luaChon == "2") {
+        sapXepDanhSachPhim(headPhim, true, true);   // Sắp xếp GIẢM DẦN theo Giá vé
+    } 
+    else if (luaChon == "3") {
+        sapXepDanhSachPhim(headPhim, false, false); // Sắp xếp TĂNG DẦN theo Thời lượng
+    } 
+    else if (luaChon == "4") {
+        sapXepDanhSachPhim(headPhim, true, false);  // Sắp xếp GIẢM DẦN theo Thời lượng
+    } 
+    else {
+        cout << "=> [!] Tuy chon khong hop le!\n";
+        daXuLy = false;
+    }
+
+    // Nếu người dùng chọn đúng tùy chọn hợp lệ -> Tiến hành đồng bộ và in kết quả
+    if (daXuLy) {
+        // Đồng bộ toàn bộ danh sách đã đổi thứ tự trên RAM xuống tệp CSDL
         ghiToanBoFile(FILE_DB, headPhim);
-        cout << "=> Đã sắp xếp theo giá vé TĂNG DẦN thành công!\n";
+        cout << "=> Da sap xep va DONG BO file thanh cong!\n";
+        
+        // In ra màn hình bảng danh sách phim trực quan sau khi sắp xếp xong
         xemDanhSachPhim(headPhim);
-    } else if (luaChon == "2") {
-        sapXepTheoGiaVe(headPhim, true);
-        ghiToanBoFile(FILE_DB, headPhim);
-        cout << "=> Đã sắp xếp theo giá vé GIẢM DẦN thành công!\n";
-        xemDanhSachPhim(headPhim);
-    } else if (luaChon == "3") {
-        sapXepTheoThoiLuong(headPhim, false);
-        ghiToanBoFile(FILE_DB, headPhim);
-        cout << "=> Đã sắp xếp theo thời lượng TĂNG DẦN thành công!\n";
-        xemDanhSachPhim(headPhim);
-    } else if (luaChon == "4") {
-        sapXepTheoThoiLuong(headPhim, true);
-        ghiToanBoFile(FILE_DB, headPhim);
-        cout << "=> Đã sắp xếp theo thời lượng GIẢM DẦN thành công!\n";
-        xemDanhSachPhim(headPhim);
-    } else {
-        cout << "=> Tuy chon khong hop le!\n";
     }
 }
-
 // ================================================================
 // MAIN & MENU
 // ================================================================
