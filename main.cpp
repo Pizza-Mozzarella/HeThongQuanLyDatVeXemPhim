@@ -429,13 +429,12 @@ bool KhopPhim(NodePhim* node, string MaCanXoa, string TenCanXoa) {
     bool maProvided  = !MaCanXoa.empty(); // kiem tra chui rong
     bool tenProvided = !TenCanXoa.empty();
 
-    // Khong nhap gi -> khong xoa
     if (!maProvided && !tenProvided) return false;
 
     bool khopMa  = maProvided  && (ma.find(MaCanXoa)  != string::npos);
     bool khopTen = tenProvided && (ten.find(TenCanXoa) != string::npos);
 
-    return khopMa || khopTen; // Khop ma HOAC ten la du
+    return khopMa || khopTen;
 }
 
 NodePhim* XoaPhim(NodePhim* &head, string MaCanXoa, string TenCanXoa) {
@@ -444,19 +443,18 @@ NodePhim* XoaPhim(NodePhim* &head, string MaCanXoa, string TenCanXoa) {
     for (char &c : MaCanXoa) c = tolower(c);
     for (char &c : TenCanXoa) c = tolower(c);
 
-    // Truong hop 1: Node dau tien khop
+    // Node dau tien khop
     if (KhopPhim(head, MaCanXoa, TenCanXoa)) {
         NodePhim* del = head;
-        head = head->next;   // Dich head sang node tiep theo
+        head = head->next;  
         return del;
     }
 
-    // Truong hop 2: Tim trong phan con lai
     NodePhim* p = head;
     while (p->next != nullptr) {
         if (KhopPhim(p->next, MaCanXoa, TenCanXoa)) {
             NodePhim* del = p->next;
-            p->next = del->next;  // Noi lai linked list, bo qua node bi xoa
+            p->next = del->next; 
             return del;
         }
         p = p->next;
@@ -602,6 +600,8 @@ void hienThiMenu() {
     cout << "\n===== QUAN LY DAT VE XEM PHIM =====\n";
     cout << "  1. Them danh sach phim moi\n";
     cout << "  2. Xem danh sach phim\n";
+    cout << "  4. Tim kiem phim\n";
+    cout << "  5. Xoa phim\n";
     cout << "  6. Cap nhat thong tin phim\n";
     cout << "  7. Sap xep danh sach phim\n";
     cout << "  0. Thoat\n";
@@ -658,6 +658,54 @@ int main() {
                 cout << "[!] Danh sach hien dang trong, vui long nhap phim truoc!\n";
             } else {
                 xemDanhSachPhim(headPhim);
+            }
+        }
+        else if (chon == "4"){
+            string MaPhim, TenPhim;
+            double giaMin, giaMax;
+            cout << "======== Tim Kiem ========" << endl;
+            cout << "[*] Muon tim theo thuoc tinh gi thi bo trong cac thuoc tinh khac" << endl;
+            cout << "Ma phim : ";
+            getline(cin, MaPhim);
+            cout << "Ten Phim : ";
+            getline(cin, TenPhim);
+            cout << "gia Min - gia Max : ";
+            cin >> giaMin >> giaMax;
+            cin.ignore(1, '\n');
+            cout << "============== KET QUA ==============" << endl;
+            DanhSach_TimKiem(headPhim, MaPhim, TenPhim, giaMin, giaMax);
+        }
+        else if(chon == "5") {
+            string TenCanXoa, MaCanXoa;
+            cout << "---Xoa Phim--- \n[*] Tim theo ma thi bo trong ten va nguoc lai." << endl;
+            cout << "Ma : ";
+            getline(cin, MaCanXoa);
+            cout << "Ten : ";
+            getline(cin, TenCanXoa);
+
+            // Lay du lieu xuong RAM
+            NodePhim* kq = XoaPhim(headPhim, MaCanXoa, TenCanXoa);
+
+            // in KQ
+            cout << "\n--- DA XOA ---\n";
+            if (kq != nullptr) {
+                printf("\n%-8s %-30s %-15s %-12s %s\n", 
+                    "Ma", "Ten Phim", "The Loai", "Thoi Luong", "Gia Ve");
+                printf("%-8s %-30s %-15s %-9d %s  %.0f VND\n",
+                        kq->data.ma.c_str(),
+                        kq->data.ten.c_str(),
+                        kq->data.theLoai.c_str(),
+                        kq->data.thoiLuong,
+                        "phut",
+                        kq->data.giaVe);
+                
+                    // Tra du lieu ve file
+                    ghiToanBoFile(FILE_DB, headPhim);
+                    cout << "[Thanh cong] Da xoa va dong bo lai vao file Database!\n";
+                    delete kq;
+            } 
+            else {
+                cout << "[That bai] Khong tim thay phim de xoa!\n";
             }
         }
         else if (chon == "6") {
