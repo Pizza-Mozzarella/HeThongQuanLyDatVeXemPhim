@@ -85,20 +85,13 @@ NodePhim* timPhimTheoMa(NodePhim* head, string ma);
 void inTieuDeBang();
 void inDongPhim(const Phim& p);
 void giaiPhong(NodePhim*& head);
-
-// --- 3.2. Các hàm quản lý Notification ---
-void khoiTaoQueueLog(NotificationQueue& q, int cap);
-void pushLog(NotificationQueue& q, string noiDung);
-void hienThiDanhSachLog(const NotificationQueue& q);
-void giaiPhongQueueLog(NotificationQueue& q);
-
-// --- 3.3. Hàm thao tác Cơ sở dữ liệu (Database Operations) ---
+// --- 3.2. Hàm thao tác Cơ sở dữ liệu (Database Operations) ---
 bool kiemTraDBTrong(const string& file);
 string taoGheDong(int so, ThongTinGhe ghe);
 void docDanhSachPhim(const string& file, NodePhim*& head, int& veKeTiep);
 void ghiToanBoFile(const string& file, NodePhim* head);
 
-// --- 3.4. Các hàm nghiệp vụ CRUD & Phòng vé ---
+// --- 3.3. Các hàm nghiệp vụ CRUD & Phòng vé ---
 void themPhim(NodePhim*& head, Phim p);
 Phim nhapMotPhim(NodePhim* head);
 void nhapDanhSachPhim(NodePhim*& head, NotificationQueue& qLog);
@@ -128,7 +121,11 @@ void xemSoDoGhe(NodePhim* p);
 void datVe(NodePhim* headPhim, int& veKeTiep, NotificationQueue& qLog);
 void huyVe(NodePhim* headPhim, NotificationQueue& qLog);
 void hienMenuDatVeHuyVe(NodePhim* headPhim, int& veKeTiep, NotificationQueue& qLog);
-
+// Chức năng 9: Nhật ký hoạt động ---
+void khoiTaoQueueLog(NotificationQueue& q, int cap);
+void pushLog(NotificationQueue& q, string noiDung);
+void hienThiDanhSachLog(const NotificationQueue& q);
+void giaiPhongQueueLog(NotificationQueue& q);
 // --- 3.5. Điều khiển hệ thống & Menu ---
 void hienThiMenu();
 void khoiTaoHeThong(const string& file, NodePhim*& head, int& veKeTiep);
@@ -241,56 +238,6 @@ void giaiPhong(NodePhim*& head) {
         head = head->next;
         delete t;
     }
-}
-// Khởi tạo NotificationQueue với dung lượng mặc định (capacity) là 5
-void khoiTaoQueueLog(NotificationQueue& q, int cap = 5) {
-    q.front = q.rear = nullptr;
-    q.count = 0;
-    q.capacity = cap;
-}
-// Thêm một log mới vào NotificationQueue, nếu vượt quá capacity thì loại bỏ log cũ nhất
-void pushLog(NotificationQueue& q, string noiDung) {
-    NodeLog* newNode = new NodeLog{ {noiDung}, nullptr };
-    if (q.count >= q.capacity) {
-        NodeLog* temp = q.front;
-        q.front = q.front->next;
-        delete temp;
-        q.count--;
-    }
-    if (q.rear == nullptr) {
-        q.front = q.rear = newNode;
-    } else {
-        q.rear->next = newNode;
-        q.rear = newNode;
-    }
-    q.count++;
-}
-// hiển thị danh sách log hoạt động từ NotificationQueue, hiển thị theo thứ tự từ cũ nhất đến mới nhất
-void hienThiDanhSachLog(const NotificationQueue& q) {
-    cout << "\n======== NHAT KY HOAT DONG ========\n";
-    if (q.front == nullptr) {
-        cout << "  (Chua co hoat dong nao duoc ghi nhan)\n";
-        cout << "=================================================================\n";
-        return;
-    }
-    
-    NodeLog* p = q.front;
-    int stt = 1;
-    while (p != nullptr) {
-        cout << "  " << stt++ << ". " << p->data.noiDung << "\n";
-        p = p->next;
-    }
-    cout << "=================================================================\n";
-}
-// Giải phóng toàn bộ bộ nhớ RAM của NotificationQueue khi kết thúc chương trình
-void giaiPhongQueueLog(NotificationQueue& q) {
-    while (q.front != nullptr) {
-        NodeLog* temp = q.front;
-        q.front = q.front->next;
-        delete temp;
-    }
-    q.rear = nullptr;
-    q.count = 0;
 }
 
 // ================================================================
@@ -1016,6 +963,59 @@ void hienMenuDatVeHuyVe(NodePhim* headPhim, int& veKeTiep, NotificationQueue& qL
         cout << "[!] Tuy chon khong hop le!\n";
     }
 }
+// 6.8. NHẬT KÝ HOẠT ĐỘNG 
+// Khởi tạo NotificationQueue với dung lượng mặc định (capacity) là 5
+void khoiTaoQueueLog(NotificationQueue& q, int cap = 5) {
+    q.front = q.rear = nullptr;
+    q.count = 0;
+    q.capacity = cap;
+}
+// Thêm một log mới vào NotificationQueue, nếu vượt quá capacity thì loại bỏ log cũ nhất
+void pushLog(NotificationQueue& q, string noiDung) {
+    NodeLog* newNode = new NodeLog{ {noiDung}, nullptr };
+    if (q.count >= q.capacity) {
+        NodeLog* temp = q.front;
+        q.front = q.front->next;
+        delete temp;
+        q.count--;
+    }
+    if (q.rear == nullptr) {
+        q.front = q.rear = newNode;
+    } else {
+        q.rear->next = newNode;
+        q.rear = newNode;
+    }
+    q.count++;
+}
+// hiển thị danh sách log hoạt động từ NotificationQueue, hiển thị theo thứ tự từ cũ nhất đến mới nhất
+void hienThiDanhSachLog(const NotificationQueue& q) {
+    cout << "\n======== NHAT KY HOAT DONG ========\n";
+    if (q.front == nullptr) {
+        cout << "  (Chua co hoat dong nao duoc ghi nhan)\n";
+        cout << "=================================================================\n";
+        return;
+    }
+    
+    NodeLog* p = q.front;
+    int stt = 1;
+    while (p != nullptr) {
+        cout << "  " << stt++ << ". " << p->data.noiDung << "\n";
+        p = p->next;
+    }
+    cout << "=================================================================\n";
+}
+// Giải phóng toàn bộ bộ nhớ RAM của NotificationQueue khi kết thúc chương trình
+void giaiPhongQueueLog(NotificationQueue& q) {
+    while (q.front != nullptr) {
+        NodeLog* temp = q.front;
+        q.front = q.front->next;
+        delete temp;
+    }
+    q.rear = nullptr;
+    q.count = 0;
+}
+
+
 
 // ================================================================
 // 7. MENU CHÍNH & HỆ THỐNG KHỞI TẠO
