@@ -434,7 +434,7 @@ void nhapDanhSachPhim(NodePhim*& head, NotificationQueue& qLog) {
     cout << "========================================\n";
 }
 
-// 7.2. HIỂN THỊ DANH SÁCH PHIM DẠNG BẢNG (READ)
+// 6.2. HIỂN THỊ DANH SÁCH PHIM DẠNG BẢNG (READ)
 void xemDanhSachPhim(NodePhim* headPhim) {
     inTieuDeBang();
     NodePhim* p = headPhim;
@@ -444,7 +444,7 @@ void xemDanhSachPhim(NodePhim* headPhim) {
     }
     printf("%s\n", string(104, '=').c_str());
 }
-// 7.3. TÌM KIẾM PHIM ĐA TIÊU CHÍ (SEARCH)
+// 6.3. TÌM KIẾM PHIM ĐA TIÊU CHÍ (SEARCH)
 // Kiểm tra trùng khớp mã phim (tìm kiếm gần đúng, không phân biệt hoa thường)
 bool timTheoMa(NodePhim* p, string maCanTim) {
     if (maCanTim.empty()) return false;
@@ -528,7 +528,7 @@ void hienMenuTimKiem(NodePhim* head) {
     inDanhSachKetQua(head, maCanTim, tenCanTim, giaMin, giaMax);
 }
 // ----------------------------------------------------------------
-// 7.4. XÓA PHIM (DELETE)
+// 6.4. XÓA PHIM (DELETE)
 // ----------------------------------------------------------------
 
 // Kiểm tra bộ phim có khớp với mã hoặc tên cần xóa không
