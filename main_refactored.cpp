@@ -79,34 +79,34 @@ void docDanhSachPhim(const string& file, NodePhim*& head, int& veKeTiep);
 void ghiToanBoFile(const string& file, NodePhim* head);
 
 // --- 4.3. Các hàm nghiệp vụ CRUD ---
-// Chức năng 1 & 2: Thêm phim
+// Chức năng 1: Thêm phim
 void themPhim(NodePhim*& head, Phim p);
 Phim nhapMotPhim(NodePhim* head);
 void nhapDanhSachPhim(NodePhim*& head);
 
-// Chức năng 3: Xem danh sách
+// Chức năng 2: Xem danh sách
 void xemDanhSachPhim(NodePhim* headPhim);
 
-// Chức năng 4: Tìm kiếm phim
+// Chức năng 3: Tìm kiếm phim
 bool timTheoMa(NodePhim* p, string maCanTim);
 bool timTheoTen(NodePhim* p, string tenCanTim);
 bool timTheoGia(NodePhim* p, double giaMin, double giaMax);
 void inDanhSachKetQua(NodePhim* head, string maCanTim, string tenCanTim, double giaMin, double giaMax);
 void hienMenuTimKiem(NodePhim* head);
 
-// Chức năng 5: Xóa phim
+// Chức năng 4: Xóa phim
 bool khopPhim(NodePhim* node, string maCanXoa, string tenCanXoa);
 NodePhim* xoaPhim(NodePhim*& head, string maCanXoa, string tenCanXoa);
 void hienMenuXoaPhim(NodePhim*& headPhim);
 
-// Chức năng 6: Cập nhật thông tin
+// Chức năng 5: Cập nhật thông tin
 void capNhatThongTinPhim(NodePhim* headPhim);
 
-// Chức năng 7: Sắp xếp danh sách
+// Chức năng 6: Sắp xếp danh sách
 void sapXepDanhSachPhim(NodePhim*& head, bool giamDan, bool laGiaVe);
 void hienThiMenuSapXep(NodePhim* headPhim);
 
-// Chức năng 8: Nghiệp vụ phòng vé (Đặt vé & Hủy vé)
+// Chức năng 7 & 8: Nghiệp vụ phòng vé (Đặt vé & Hủy vé)
 void xemSoDoGhe(NodePhim* p);
 void datVe(NodePhim* headPhim, int& veKeTiep);
 void huyVe(NodePhim* headPhim);
