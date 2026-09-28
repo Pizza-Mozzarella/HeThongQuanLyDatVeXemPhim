@@ -13,86 +13,8 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <stack>
 
 using namespace std;
-
-
-// -------------------------------------------------------------------
-// Snapshot for Undo/Redo (deep copy of linked list)
-// -------------------------------------------------------------------
-struct Snapshot {
-    NodePhim* headCopy;
-    int veKeTiepCopy;
-};
-
-std::stack<Snapshot> undoStack;
-std::stack<Snapshot> redoStack;
-const int MAX_UNDO = 20;
-
-// Deep copy whole linked list
-NodePhim* saoChepDanhSach(NodePhim* src) {
-    if (!src) return nullptr;
-    NodePhim* newHead = new NodePhim{ src->data, nullptr };
-    NodePhim* tail = newHead;
-    NodePhim* cur = src->next;
-    while (cur) {
-        tail->next = new NodePhim{ cur->data, nullptr };
-        tail = tail->next;
-        cur = cur->next;
-    }
-    return newHead;
-}
-
-// Save current state (clears redo stack)
-void luuTrangThai(NodePhim* head, int veKeTiep) {
-    while (!redoStack.empty()) redoStack.pop();
-    undoStack.push({ saoChepDanhSach(head), veKeTiep });
-    if (undoStack.size() > MAX_UNDO) {
-        // Keep only the newest MAX_UNDO snapshots
-        std::stack<Snapshot> tmp;
-        while (undoStack.size() > MAX_UNDO) {
-            tmp.push(undoStack.top());
-            undoStack.pop();
-        }
-        while (!tmp.empty()) {
-            undoStack.push(tmp.top());
-            tmp.pop();
-        }
-    }
-}
-
-// Undo operation
-void undo(NodePhim*& head, int& veKeTiep) {
-    if (undoStack.empty()) {
-        cout << "[!] Khong co thao tac de Undo." << endl;
-        return;
-    }
-    redoStack.push({ saoChepDanhSach(head), veKeTiep });
-    Snapshot snap = undoStack.top();
-    undoStack.pop();
-    giaiPhong(head);
-    head = snap.headCopy;
-    veKeTiep = snap.veKeTiepCopy;
-    ghiToanBoFile(FILE_DB, head);
-    cout << "=> [Undo] Da quay lai trang thai truoc do." << endl;
-}
-
-// Redo operation
-void redo(NodePhim*& head, int& veKeTiep) {
-    if (redoStack.empty()) {
-        cout << "[!] Khong co thao tac de Redo." << endl;
-        return;
-    }
-    undoStack.push({ saoChepDanhSach(head), veKeTiep });
-    Snapshot snap = redoStack.top();
-    redoStack.pop();
-    giaiPhong(head);
-    head = snap.headCopy;
-    veKeTiep = snap.veKeTiepCopy;
-    ghiToanBoFile(FILE_DB, head);
-    cout << "=> [Redo] Da khoi phuc thao tac vua huy." << endl;
-}
 
 // ================================================================
 // 2. HẰNG SỐ HỆ THỐNG (CONSTANTS)
