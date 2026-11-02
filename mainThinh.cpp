@@ -1,0 +1,1477 @@
+// ================================================================
+// DỰ ÁN: HỆ THỐNG QUẢN LÝ ĐẶT VÉ XEM PHIM (MOVIE BOOKING SYSTEM)
+// CẤU TRÚC DỮ LIỆU: DANH SÁCH LIÊN KẾT ĐƠN (SINGLY LINKED LIST)
+// PHIÊN BẢN REFACTOR: TỔ CHỨC LẠI BỐ CỤC MÃ NGUỒN CHUẨN MỰC
+// BỔ SUNG: CHỨC NĂNG 14 (LỊCH SỬ THAO TÁC) - module tách riêng, KHÔNG sửa
+// các hàm chức năng gốc: hàm gốc chạy xong, main gọi thêm hàm ghi lịch sử.
+// BỔ SUNG: CHỨC NĂNG 10 (HÀNG ĐỢI ĐẶT VÉ - QUEUE) - module tách riêng.
+// ================================================================
+
+// ================================================================
+// 1. KHAI BÁO THƯ VIỆN (LIBRARIES)
+// ================================================================
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ctime>
+
+using namespace std;
+
+// ================================================================
+// 2. HẰNG SỐ HỆ THỐNG (CONSTANTS)
+// ================================================================
+const int SO_HANG = 5;                  // Hàng A -> E (chỉ số 0..4)
+const int SO_COT  = 6;                  // Cột 1 -> 6 (chỉ số 0..5)
+const int TONG_GHE = SO_HANG * SO_COT;  // Tổng số ghế phòng chiếu = 30
+const string FILE_DB = "cinema_db.txt"; // Tệp tin cơ sở dữ liệu lưu trữ
+const string FILE_LICH_SU = "history.txt"; // Tệp lưu lịch sử thao tác (Chức năng 14)
+const string FILE_HANG_DOI = "hang_doi.txt"; // Tệp lưu hàng đợi khách chờ (Chức năng 10)
+
+// ================================================================
+// 3. CẤU TRÚC DỮ LIỆU (STRUCTS)
+// ================================================================
+
+// Thông tin vé xem phim
+struct MaVe {
+    int    soVe;      // 0 = chưa đặt, >= 1001 = mã số vé đã đặt
+    string tenKhach;  // Họ và tên khách hàng
+    string sdt;       // Số điện thoại liên hệ
+};
+
+// Trạng thái của một ô ghế trong phòng chiếu
+struct ThongTinGhe {
+    bool  daDat;      // false = ghế trống, true = ghế đã có người đặt
+    MaVe  ve;         // Dữ liệu vé đi kèm (chỉ có nghĩa khi daDat == true)
+};
+
+// Thông tin một bộ phim và toàn bộ sơ đồ 30 ghế của phòng chiếu
+struct Phim {
+    string       ma;                    // Mã phim định danh duy nhất (VD: "P01")
+    string       ten;                   // Tên bộ phim
+    string       theLoai;               // Thể loại phim
+    int          thoiLuong;             // Thời lượng chiếu (phút)
+    double       giaVe;                 // Đơn vị giá vé (VND)
+    ThongTinGhe  ghe[SO_HANG][SO_COT]; // Ma trận ghế 5 hàng x 6 cột
+};
+
+// Cấu trúc một Node trong Danh sách liên kết đơn
+struct NodePhim {
+    Phim      data;   // Dữ liệu bộ phim chứa trong node
+    NodePhim* next;   // Con trỏ liên kết trỏ tới node kế tiếp
+};
+
+// Một node của danh sách liên kết lưu lịch sử thao tác (Chức năng 14)
+struct NodeLichSu {
+    string      thoiGian; // Thời điểm thực hiện thao tác, dạng "DD/MM/YYYY HH:MM:SS"
+    string      moTa;     // Nội dung mô tả thao tác đã thực hiện
+    NodeLichSu* next;     // Con trỏ tới thao tác thực hiện trước đó
+};
+
+// Lịch sử thao tác (Chức năng 14): danh sách liên kết đơn lưu TOÀN BỘ thao tác
+// người dùng đã thực hiện ở các chức năng 1-8.
+// Thao tác mới nhất được chèn vào ĐẦU danh sách, nên duyệt từ đầu danh sách
+// là thấy ngay thứ tự mới nhất -> cũ nhất.
+// Mỗi thao tác đồng thời được ghi thêm 1 dòng vào file history.txt và file
+// được nạp lại khi mở chương trình, nên lịch sử giữ được qua các phiên.
+struct LichSuThaoTac {
+    NodeLichSu* dau     = nullptr; // Thao tác mới nhất
+    int         soLuong = 0;       // Tổng số thao tác đã ghi nhận
+};
+
+// Một khách đang xếp hàng chờ mua vé tại quầy (Chức năng 10 - Queue)
+struct KhachCho {
+    string tenKhach; // Họ tên khách chờ
+    string sdt;      // Số điện thoại khách chờ
+    string maPhim;   // Mã phim khách muốn xem
+};
+
+// Một node của hàng đợi khách chờ
+struct NodeHangDoi {
+    KhachCho     data;
+    NodeHangDoi* next;
+};
+
+// Hàng đợi FIFO: front = đầu hàng (được phục vụ trước), rear = cuối hàng
+// (khách mới nối vào). Giữ cả 2 con trỏ nên thêm/lấy đều là O(1).
+struct HangDoi {
+    NodeHangDoi* front   = nullptr;
+    NodeHangDoi* rear    = nullptr;
+    int          soLuong = 0;
+};
+
+// ================================================================
+// 4. KHAI BÁO NGUYÊN MẪU HÀM (FUNCTION PROTOTYPES)
+// ================================================================
+
+// --- 4.1. Hàm tiện ích cơ bản & Kiểm tra hợp lệ (Basic Helpers & Validation) ---
+string chuyenChuThuong(string s);
+string nhapChuoi(string thongBao);
+int nhapSoNguyen(string thongBao, int minVal, int maxVal);
+double nhapSoThuc(string thongBao, double minVal, double maxVal);
+bool kiemTraTrungMa(NodePhim* head, string ma);
+NodePhim* timPhimTheoMa(NodePhim* head, string ma);
+void inTieuDeBang();
+void inDongPhim(const Phim& p);
+void giaiPhong(NodePhim*& head);
+
+// --- 4.2. Hàm thao tác Cơ sở dữ liệu (Database Operations) ---
+bool kiemTraDBTrong(const string& file);
+string taoGheDong(int so, ThongTinGhe ghe);
+void docDanhSachPhim(const string& file, NodePhim*& head, int& veKeTiep);
+void ghiToanBoFile(const string& file, NodePhim* head);
+
+// --- 4.3. Các hàm nghiệp vụ CRUD ---
+// Chức năng 1: Thêm phim
+void themPhim(NodePhim*& head, Phim p);
+Phim nhapMotPhim(NodePhim* head);
+void nhapDanhSachPhim(NodePhim*& head);
+
+// Chức năng 2: Xem danh sách
+void xemDanhSachPhim(NodePhim* headPhim);
+
+// Chức năng 3: Tìm kiếm phim
+bool timTheoMa(NodePhim* p, string maCanTim);
+bool timTheoTen(NodePhim* p, string tenCanTim);
+bool timTheoGia(NodePhim* p, double giaMin, double giaMax);
+void inDanhSachKetQua(NodePhim* head, string maCanTim, string tenCanTim, double giaMin, double giaMax);
+void hienMenuTimKiem(NodePhim* head);
+
+// Chức năng 4: Xóa phim
+bool khopPhim(NodePhim* node, string maCanXoa, string tenCanXoa);
+NodePhim* xoaPhim(NodePhim*& head, string maCanXoa, string tenCanXoa);
+void hienMenuXoaPhim(NodePhim*& headPhim);
+
+// Chức năng 5: Cập nhật thông tin
+void capNhatThongTinPhim(NodePhim* headPhim);
+
+// Chức năng 6: Sắp xếp danh sách
+void sapXepDanhSachPhim(NodePhim*& head, bool giamDan, bool laGiaVe);
+void hienThiMenuSapXep(NodePhim* headPhim);
+
+// Chức năng 7 & 8: Nghiệp vụ phòng vé (Đặt vé & Hủy vé)
+void xemSoDoGhe(NodePhim* p);
+void datVe(NodePhim* headPhim, int& veKeTiep);
+void huyVe(NodePhim* headPhim);
+void hienMenuDatVeHuyVe(NodePhim* headPhim, int& veKeTiep);
+
+// --- 4.4. Chức năng 14: Lịch sử thao tác ---
+string layThoiGianHienTai();
+void docLichSu(LichSuThaoTac& lichSu);
+void ghiLichSu(LichSuThaoTac& lichSu, string moTa);
+void xemLichSu(const LichSuThaoTac& lichSu);
+void giaiPhongLichSu(LichSuThaoTac& lichSu);
+
+// --- 4.5. Chức năng 10: Hàng đợi đặt vé (Queue) ---
+void themVaoHangDoi(HangDoi& hangDoi, KhachCho khach);
+bool layKhachDauHang(HangDoi& hangDoi, KhachCho& khachRa);
+void docHangDoi(HangDoi& hangDoi);
+void ghiFileHangDoi(const HangDoi& hangDoi);
+void giaiPhongHangDoi(HangDoi& hangDoi);
+void hienMenuHangDoi(HangDoi& hangDoi, NodePhim* headPhim, int& veKeTiep);
+
+// --- 4.6. Hàm điều khiển hệ thống & Menu ---
+void hienThiMenu();
+void khoiTaoHeThong(const string& file, NodePhim*& head, int& veKeTiep);
+
+// ================================================================
+// 5. CÁC HÀM TIỆN ÍCH CƠ BẢN NHẤT (ATOMIC / REUSABLE / VALIDATION)
+// (Các hàm nhỏ nhất, không thể chia nhỏ hơn, dùng làm nền tảng tái sử dụng)
+// ================================================================
+
+// Chuyển toàn bộ chuỗi ký tự về chữ thường (lowercase) phục vụ so sánh chuỗi
+string chuyenChuThuong(string s) {
+    for (char& c : s) {
+        c = tolower(c);
+    }
+    return s;
+}
+
+// Nhập chuỗi ký tự an toàn, bắt buộc không được để trống (chống trôi lệnh cin)
+string nhapChuoi(string thongBao) {
+    string s;
+    while (true) {
+        cout << thongBao;
+        getline(cin, s);
+        if (!s.empty()) {
+            return s;
+        }
+        cout << "  [!] Thong tin khong duoc bo trong. Vui long nhap lai!\n";
+    }
+}
+
+// Nhập số nguyên an toàn trong đoạn [minVal, maxVal] (chống crash khi nhập chữ cái)
+int nhapSoNguyen(string thongBao, int minVal, int maxVal) {
+    string s;
+    while (true) {
+        cout << thongBao;
+        getline(cin, s);
+
+        stringstream ss(s);
+        int val;
+        if (ss >> val && ss.eof()) {
+            if (val >= minVal && val <= maxVal) {
+                return val;
+            }
+            cout << "  [!] Gia tri phai nam trong khoang [" << minVal << " - " << maxVal << "]!\n";
+        } else {
+            cout << "  [!] Dinh dang khong hop le! Vui long nhap so nguyen.\n";
+        }
+    }
+}
+
+// Nhập số thực an toàn trong đoạn [minVal, maxVal] (áp dụng cho đơn giá vé)
+double nhapSoThuc(string thongBao, double minVal, double maxVal) {
+    string s;
+    while (true) {
+        cout << thongBao;
+        getline(cin, s);
+
+        stringstream ss(s);
+        double val;
+        if (ss >> val && ss.eof()) {
+            if (val >= minVal && val <= maxVal) {
+                return val;
+            }
+            cout << "  [!] Gia ve phai tu " << (long long)minVal << " den " << (long long)maxVal << " VND!\n";
+        } else {
+            cout << "  [!] Dinh dang khong hop le! Vui long nhap dung so thuc.\n";
+        }
+    }
+}
+
+// Tìm con trỏ NodePhim theo mã phim (so sánh không phân biệt hoa/thường, khớp chính xác mã)
+NodePhim* timPhimTheoMa(NodePhim* head, string ma) {
+    if (ma.empty()) return nullptr;
+    string maTim = chuyenChuThuong(ma);
+    NodePhim* p = head;
+    while (p != nullptr) {
+        if (chuyenChuThuong(p->data.ma) == maTim) {
+            return p;
+        }
+        p = p->next;
+    }
+    return nullptr;
+}
+
+// Kiểm tra tính duy nhất của mã phim trong danh sách liên kết (chống trùng khóa chính)
+bool kiemTraTrungMa(NodePhim* head, string ma) {
+    return timPhimTheoMa(head, ma) != nullptr;
+}
+
+// In dòng tiêu đề chuẩn cho bảng hiển thị danh sách phim
+void inTieuDeBang() {
+    printf("\n%-8s %-40s %-24s %-14s %-14s\n", "Ma", "Ten Phim", "The Loai", "Thoi Luong", "Gia Ve");
+    printf("%s\n", string(104, '-').c_str());
+}
+
+// In một dòng dữ liệu của bộ phim ra bảng theo đúng định dạng cột (căn lề rộng rãi, không bị xô lệch)
+void inDongPhim(const Phim& p) {
+    string thoiLuongStr = to_string(p.thoiLuong) + " phut";
+    string giaVeStr     = to_string((long long)p.giaVe) + " VND";
+    printf("%-8s %-40s %-24s %-14s %-14s\n",
+           p.ma.c_str(),
+           p.ten.c_str(),
+           p.theLoai.c_str(),
+           thoiLuongStr.c_str(),
+           giaVeStr.c_str());
+}
+
+// Giải phóng toàn bộ bộ nhớ RAM của Danh sách liên kết khi kết thúc chương trình
+void giaiPhong(NodePhim*& head) {
+    while (head != nullptr) {
+        NodePhim* t = head;
+        head = head->next;
+        delete t;
+    }
+}
+
+// ================================================================
+// 6. THAO TÁC CƠ SỞ DỮ LIỆU (DATABASE OPERATIONS - FILE I/O)
+// ================================================================
+
+// Kiểm tra tệp cơ sở dữ liệu có dữ liệu hay đang rỗng
+bool kiemTraDBTrong(const string& file) {
+    ifstream f(file);
+    if (!f.is_open()) {
+        return true; // File chưa tồn tại -> coi như rỗng
+    }
+
+    string dong;
+    while (getline(f, dong)) {
+        if (!dong.empty() && dong.find_first_not_of(" \t\r\n") != string::npos) {
+            f.close();
+            return false; // File có dữ liệu
+        }
+    }
+
+    f.close();
+    return true; // File rỗng 0 byte
+}
+
+// Chuyển đổi trạng thái một ô ghế thành định dạng văn bản để ghi file
+string taoGheDong(int so, ThongTinGhe ghe) {
+    string soStr = (so < 10 ? "0" : "") + to_string(so);
+    if (!ghe.daDat) {
+        return soStr + "|O"; // Ghế trống
+    }
+    return soStr + "|X|" + to_string(ghe.ve.soVe) + "|" + ghe.ve.tenKhach + "|" + ghe.ve.sdt;
+}
+
+// Đọc toàn bộ danh sách phim và tình trạng ghế từ tệp text nạp lên RAM
+void docDanhSachPhim(const string& file, NodePhim*& head, int& veKeTiep) {
+    ifstream f(file);
+    if (!f.is_open()) return;
+
+    string dong;
+    NodePhim* node = nullptr;
+
+    while (getline(f, dong)) {
+        if (!dong.empty() && dong.back() == '\r') dong.pop_back();
+        if (dong.empty()) continue;
+
+        if (dong[0] == '#') {
+            // Header phim: #P01|Avatar|Hanh Dong|192|90000
+            stringstream ss(dong.substr(1));
+            Phim p{};
+            string thoiStr, giaStr;
+            getline(ss, p.ma,       '|');
+            getline(ss, p.ten,      '|');
+            getline(ss, p.theLoai,  '|');
+            getline(ss, thoiStr,    '|');
+            getline(ss, giaStr);
+
+            p.thoiLuong = stoi(thoiStr);
+            p.giaVe     = stod(giaStr);
+
+            // Khởi tạo 30 ô ghế trống ban đầu
+            for (int r = 0; r < SO_HANG; r++) {
+                for (int c = 0; c < SO_COT; c++) {
+                    p.ghe[r][c] = { false, {0, "", ""} };
+                }
+            }
+
+            themPhim(head, p);
+
+            // Con trỏ giữ node vừa thêm để tiếp tục nạp 30 ghế bên dưới
+            node = head;
+            while (node->next) node = node->next;
+        } else {
+            // Dòng dữ liệu ghế ngồi
+            if (!node) continue;
+            stringstream ss(dong);
+            string soStr, trangThai;
+            getline(ss, soStr,     '|');
+            getline(ss, trangThai, '|');
+
+            if (trangThai == "X") {
+                string soVeStr, tenKhach, sdt;
+                getline(ss, soVeStr,  '|');
+                getline(ss, tenKhach, '|');
+                getline(ss, sdt);
+
+                int so = stoi(soStr);
+                int r  = (so - 1) / SO_COT;
+                int c  = (so - 1) % SO_COT;
+                int soVe = stoi(soVeStr);
+
+                node->data.ghe[r][c] = { true, {soVe, tenKhach, sdt} };
+                if (soVe >= veKeTiep) veKeTiep = soVe + 1; // Duy trì mã vé tự tăng
+            }
+        }
+    }
+    f.close();
+}
+
+// Ghi đè toàn bộ danh sách liên kết từ RAM xuống tệp tin cơ sở dữ liệu
+void ghiToanBoFile(const string& file, NodePhim* head) {
+    ofstream f(file);
+    NodePhim* p = head;
+
+    while (p != nullptr) {
+        // Ghi tiêu đề phim
+        f << "#" << p->data.ma << "|" << p->data.ten << "|"
+                 << p->data.theLoai << "|" << p->data.thoiLuong << "|"
+                 << p->data.giaVe << "\n";
+
+        // Ghi tuần tự 30 ghế
+        for (int r = 0; r < SO_HANG; r++) {
+            for (int c = 0; c < SO_COT; c++) {
+                int so = r * SO_COT + c + 1;
+                f << taoGheDong(so, p->data.ghe[r][c]) << "\n";
+            }
+        }
+        p = p->next;
+    }
+    f.close();
+}
+
+// ================================================================
+// 7. CÁC CHỨC NĂNG NGHIỆP VỤ CRUD
+// ================================================================
+
+// ----------------------------------------------------------------
+// 7.1. NHẬP & THÊM PHIM MỚI (CREATE)
+// ----------------------------------------------------------------
+
+// Thêm một node phim mới vào cuối danh sách liên kết
+void themPhim(NodePhim*& head, Phim p) {
+    NodePhim* node = new NodePhim{ p, nullptr };
+    if (head == nullptr) {
+        head = node;
+        return;
+    }
+    NodePhim* t = head;
+    while (t->next != nullptr) {
+        t = t->next;
+    }
+    t->next = node;
+}
+
+// Nhập chi tiết một bộ phim, kiểm tra trùng mã và khởi tạo 30 ghế trống
+Phim nhapMotPhim(NodePhim* head) {
+    Phim p{};
+
+    // Bước 1: Nhập và kiểm tra mã phim duy nhất
+    while (true) {
+        p.ma = nhapChuoi("  + Nhap ma phim (VD: P05): ");
+        if (kiemTraTrungMa(head, p.ma)) {
+            cout << "  [!] Ma phim '" << p.ma << "' DA TON TAI! Vui long dung ma khac.\n";
+        } else {
+            break;
+        }
+    }
+
+    // Bước 2: Nhập thông tin chi tiết qua các hàm validation
+    p.ten       = nhapChuoi("  + Nhap ten phim: ");
+    p.theLoai   = nhapChuoi("  + Nhap the loai: ");
+    p.thoiLuong = nhapSoNguyen("  + Nhap thoi luong (15 - 360 phut): ", 15, 360);
+    p.giaVe     = nhapSoThuc("  + Nhap gia ve (10,000 - 1,000,000 VND): ", 10000, 1000000);
+
+    // Bước 3: Khởi tạo 30 ô ghế trống cho phim mới
+    for (int r = 0; r < SO_HANG; r++) {
+        for (int c = 0; c < SO_COT; c++) {
+            p.ghe[r][c].daDat = false;
+            p.ghe[r][c].ve = {0, "", ""};
+        }
+    }
+
+    return p;
+}
+
+// Nhập danh sách nhiều phim liên tiếp và đồng bộ xuống tệp CSDL
+void nhapDanhSachPhim(NodePhim*& head) {
+    cout << "\n========================================\n";
+    cout << "        NHAP DANH SACH PHIM MOI          \n";
+    cout << "========================================\n";
+
+    int dem = 0;
+    while (true) {
+        dem++;
+        cout << "\n>> Nhap thong tin phim thu " << dem << ":\n";
+
+        Phim p = nhapMotPhim(head);
+        themPhim(head, p);
+
+        cout << "=> Da them tam thoi vao RAM: [" << p.ma << " - " << p.ten << "]\n";
+
+        string tiep = nhapChuoi("\nBan co muon nhap them phim nua khong? (y/n): ");
+        if (tiep != "y" && tiep != "Y") {
+            break;
+        }
+    }
+
+    // Đồng bộ toàn bộ dữ liệu xuống đĩa
+    cout << "\n[Dang luu...] Dang ghi de du lieu moi vao " << FILE_DB << "...\n";
+    ghiToanBoFile(FILE_DB, head);
+
+    cout << "[Thanh cong] Da them " << dem << " phim va DONG BO 100% vao Database!\n";
+    cout << "========================================\n";
+}
+
+// ----------------------------------------------------------------
+// 7.2. HIỂN THỊ DANH SÁCH PHIM DẠNG BẢNG (READ)
+// ----------------------------------------------------------------
+void xemDanhSachPhim(NodePhim* headPhim) {
+    inTieuDeBang();
+    NodePhim* p = headPhim;
+    while (p != nullptr) {
+        inDongPhim(p->data);
+        p = p->next;
+    }
+    printf("%s\n", string(104, '=').c_str());
+}
+
+// ----------------------------------------------------------------
+// 7.3. TÌM KIẾM PHIM ĐA TIÊU CHÍ (SEARCH)
+// ----------------------------------------------------------------
+
+// Kiểm tra trùng khớp mã phim (tìm kiếm gần đúng, không phân biệt hoa thường)
+bool timTheoMa(NodePhim* p, string maCanTim) {
+    if (maCanTim.empty()) return false;
+    string maPhim = chuyenChuThuong(p->data.ma);
+    string maTim  = chuyenChuThuong(maCanTim);
+    return maPhim.find(maTim) != string::npos;
+}
+
+// Kiểm tra trùng khớp tên phim (tìm kiếm chuỗi con không phân biệt hoa thường)
+bool timTheoTen(NodePhim* p, string tenCanTim) {
+    if (tenCanTim.empty()) return false;
+    string tenPhim = chuyenChuThuong(p->data.ten);
+    string tenTim  = chuyenChuThuong(tenCanTim);
+    return tenPhim.find(tenTim) != string::npos;
+}
+
+// Kiểm tra phim có nằm trong khoảng giá vé [giaMin, giaMax]
+bool timTheoGia(NodePhim* p, double giaMin, double giaMax) {
+    if (giaMin < 0 || giaMax <= giaMin) return false;
+    return (p->data.giaVe >= giaMin && p->data.giaVe <= giaMax);
+}
+
+// In danh sách các phim thỏa mãn tiêu chí tìm kiếm
+void inDanhSachKetQua(NodePhim* head, string maCanTim, string tenCanTim, double giaMin, double giaMax) {
+    int dem = 0;
+    NodePhim* p = head;
+
+    while (p != nullptr) {
+        bool khop = timTheoMa(p, maCanTim) || timTheoTen(p, tenCanTim) || timTheoGia(p, giaMin, giaMax);
+        if (khop) {
+            if (dem == 0) {
+                inTieuDeBang();
+            }
+            inDongPhim(p->data);
+            dem++;
+        }
+        p = p->next;
+    }
+
+    if (dem == 0) {
+        cout << "[!] Khong tim thay phim nao thoa man tieu chi!\n";
+    } else {
+        printf("%s\n", string(104, '=').c_str());
+        cout << "=> Tim thay tong cong " << dem << " phim.\n";
+    }
+}
+
+// Menu điều phối tìm kiếm phim
+void hienMenuTimKiem(NodePhim* head) {
+    if (head == nullptr) {
+        cout << "[!] Danh sach phim hien dang trong, vui long nhap phim truoc!\n";
+        return;
+    }
+
+    cout << "\n======== TIM KIEM PHIM ========\n";
+    cout << "   1. Tim theo ma phim\n";
+    cout << "   2. Tim theo ten phim\n";
+    cout << "   3. Tim theo khoang gia ve\n";
+    cout << "   0. Quay lai menu chinh\n";
+    cout << "================================\n";
+
+    string maCanTim = "", tenCanTim = "";
+    double giaMin = -1, giaMax = -1;
+
+    string chonTimKiem = nhapChuoi("   Chon: ");
+
+    if (chonTimKiem == "0") {
+        cout << "=> Tro ve menu chinh.\n";
+        return;
+    } else if (chonTimKiem == "1") {
+        maCanTim = nhapChuoi("   Nhap ma phim can tim: ");
+    } else if (chonTimKiem == "2") {
+        tenCanTim = nhapChuoi("   Nhap ten phim can tim: ");
+    } else if (chonTimKiem == "3") {
+        giaMin = nhapSoThuc("   Nhap gia Min (VND): ", 0, 1000000);
+        giaMax = nhapSoThuc("   Nhap gia Max (VND): ", giaMin, 1000000);
+    } else {
+        cout << "[!] Tuy chon khong hop le!\n";
+        return;
+    }
+
+    cout << "\n======== KET QUA TIM KIEM ========\n";
+    inDanhSachKetQua(head, maCanTim, tenCanTim, giaMin, giaMax);
+}
+
+// ----------------------------------------------------------------
+// 7.4. XÓA PHIM (DELETE)
+// ----------------------------------------------------------------
+
+// Kiểm tra bộ phim có khớp với mã hoặc tên cần xóa không
+bool khopPhim(NodePhim* node, string maCanXoa, string tenCanXoa) {
+    if (maCanXoa.empty() && tenCanXoa.empty()) return false;
+
+    string ma  = chuyenChuThuong(node->data.ma);
+    string ten = chuyenChuThuong(node->data.ten);
+    string maTim  = chuyenChuThuong(maCanXoa);
+    string tenTim = chuyenChuThuong(tenCanXoa);
+
+    bool khopMa  = !maCanXoa.empty()  && (ma == maTim);
+    bool khopTen = !tenCanXoa.empty() && (ten.find(tenTim)  != string::npos);
+
+    return khopMa || khopTen;
+}
+
+// Tách node cần xóa ra khỏi danh sách liên kết đơn (xử lý cả ca đầu, giữa, cuối)
+NodePhim* xoaPhim(NodePhim*& head, string maCanXoa, string tenCanXoa) {
+    if (head == nullptr) return nullptr;
+
+    // Ca biên 1: Node cần xóa nằm ngay đầu danh sách
+    if (khopPhim(head, maCanXoa, tenCanXoa)) {
+        NodePhim* del = head;
+        head = head->next;
+        return del;
+    }
+
+    // Ca biên 2: Node cần xóa nằm ở giữa hoặc cuối danh sách
+    NodePhim* p = head;
+    while (p->next != nullptr) {
+        if (khopPhim(p->next, maCanXoa, tenCanXoa)) {
+            NodePhim* del = p->next;
+            p->next = del->next;
+            return del;
+        }
+        p = p->next;
+    }
+
+    return nullptr;
+}
+
+// Menu điều phối chức năng xóa phim (có xác nhận y/n an toàn)
+void hienMenuXoaPhim(NodePhim*& headPhim) {
+    if (headPhim == nullptr) {
+        cout << "[!] Danh sach phim hien dang trong, khong co gi de xoa!\n";
+        return;
+    }
+
+    cout << "\n======== XOA PHIM ========\n";
+    cout << "   1. Xoa theo ma phim\n";
+    cout << "   2. Xoa theo ten phim\n";
+    cout << "   0. Quay lai menu chinh\n";
+    cout << "==========================\n";
+
+    string chonXoa = nhapChuoi("   Chon: ");
+    string maCanXoa = "", tenCanXoa = "";
+
+    if (chonXoa == "0") {
+        cout << "=> Tro ve menu chinh.\n";
+        return;
+    } else if (chonXoa == "1") {
+        maCanXoa = nhapChuoi("   Nhap ma phim can xoa: ");
+    } else if (chonXoa == "2") {
+        tenCanXoa = nhapChuoi("   Nhap ten phim can xoa: ");
+    } else {
+        cout << "[!] Tuy chon khong hop le!\n";
+        return;
+    }
+
+    // Tìm kiếm xem phim có tồn tại không trước khi hỏi xác nhận
+    NodePhim* kq = nullptr;
+    NodePhim* p  = headPhim;
+    while (p != nullptr) {
+        if (khopPhim(p, maCanXoa, tenCanXoa)) {
+            kq = p;
+            break;
+        }
+        p = p->next;
+    }
+
+    if (kq == nullptr) {
+        cout << "[!] Khong tim thay phim nao khop tieu chi de xoa!\n";
+        return;
+    }
+
+    cout << "\n[Phim tim thay can xoa]\n";
+    inTieuDeBang();
+    inDongPhim(kq->data);
+    printf("%s\n", string(104, '=').c_str());
+
+    // Xác nhận an toàn trước khi xóa dữ liệu vĩnh viễn
+    string xacNhan = nhapChuoi("Ban co CHAC CHAN muon xoa phim nay? (y/n): ");
+    if (xacNhan != "y" && xacNhan != "Y") {
+        cout << "=> Da huy thao tac xoa. Phim duoc giu nguyen!\n";
+        return;
+    }
+
+    // Thực hiện ngắt liên kết node và giải phóng vùng nhớ
+    NodePhim* del = xoaPhim(headPhim, maCanXoa, tenCanXoa);
+    if (del != nullptr) {
+        cout << "=> [Thanh cong] Da xoa phim [" << del->data.ma << " - " << del->data.ten << "]!\n";
+        delete del;
+
+        // Cập nhật lại toàn bộ file database
+        ghiToanBoFile(FILE_DB, headPhim);
+        cout << "=> Da dong bo lai vao file Database an toan!\n";
+    }
+}
+
+// ----------------------------------------------------------------
+// 7.5. CẬP NHẬT THÔNG TIN PHIM (UPDATE)
+// ----------------------------------------------------------------
+void capNhatThongTinPhim(NodePhim* headPhim) {
+    cout << "\n--- CAP NHAT THONG TIN PHIM ---\n";
+    cout << "Huong dan: Nhap '0' neu muon huy thao tac.\n";
+
+    string ma = nhapChuoi("Nhap ma phim can cap nhat (VD: P01): ");
+    if (ma == "0") {
+        cout << "=> Da huy thao tac cap nhat.\n";
+        return;
+    }
+
+    NodePhim* p = timPhimTheoMa(headPhim, ma);
+    if (p == nullptr) {
+        cout << "=> [!] Khong tim thay phim co ma: " << ma << "\n";
+        return;
+    }
+
+    cout << "\n[Thong tin phim hien tai]\n";
+    cout << "- Ten phim     : " << p->data.ten << "\n";
+    cout << "- The loai     : " << p->data.theLoai << "\n";
+    cout << "- Thoi luong   : " << p->data.thoiLuong << " phut\n";
+    cout << "- Gia ve       : " << (long long)p->data.giaVe << " VND\n";
+    cout << "----------------------------------------\n";
+    cout << "Ban co muon thay doi cac thong tin sau khong? (Nhap y/n)\n";
+
+    bool coThayDoi = false;
+    string traLoi;
+
+    // 1. Cập nhật tên phim
+    traLoi = nhapChuoi("-> Doi ten phim moi? (y/n): ");
+    if (traLoi == "y" || traLoi == "Y") {
+        p->data.ten = nhapChuoi("   Nhap ten phim moi: ");
+        coThayDoi = true;
+    }
+
+    // 2. Cập nhật thể loại
+    traLoi = nhapChuoi("-> Doi the loai moi? (y/n): ");
+    if (traLoi == "y" || traLoi == "Y") {
+        p->data.theLoai = nhapChuoi("   Nhap the loai moi: ");
+        coThayDoi = true;
+    }
+
+    // 3. Cập nhật thời lượng
+    traLoi = nhapChuoi("-> Doi thoi luong moi? (y/n): ");
+    if (traLoi == "y" || traLoi == "Y") {
+        p->data.thoiLuong = nhapSoNguyen("   Nhap thoi luong moi (15 - 360 phut): ", 15, 360);
+        coThayDoi = true;
+    }
+
+    // 4. Cập nhật giá vé
+    traLoi = nhapChuoi("-> Doi gia ve moi? (y/n): ");
+    if (traLoi == "y" || traLoi == "Y") {
+        p->data.giaVe = nhapSoThuc("   Nhap gia ve moi (10,000 - 1,000,000 VND): ", 10000, 1000000);
+        coThayDoi = true;
+    }
+
+    if (coThayDoi) {
+        ghiToanBoFile(FILE_DB, headPhim);
+        cout << "=> [Thanh cong] Cap nhat thong tin va DONG BO file thanh cong!\n";
+    } else {
+        cout << "=> Khong co thong tin nao bi thay doi.\n";
+    }
+}
+
+// ----------------------------------------------------------------
+// 7.6. SẮP XẾP DANH SÁCH PHIM (SORT)
+// ----------------------------------------------------------------
+
+// Thuật toán Bubble Sort sắp xếp danh sách liên kết đơn bằng cách hoán đổi data
+void sapXepDanhSachPhim(NodePhim*& head, bool giamDan, bool laGiaVe) {
+    if (head == nullptr || head->next == nullptr) return;
+
+    bool swapped;
+    NodePhim* ptr1;
+    NodePhim* lptr = nullptr;
+
+    do {
+        swapped = false;
+        ptr1 = head;
+
+        while (ptr1->next != lptr) {
+            NodePhim* ptr2 = ptr1->next;
+
+            double val1 = laGiaVe ? ptr1->data.giaVe : ptr1->data.thoiLuong;
+            double val2 = laGiaVe ? ptr2->data.giaVe : ptr2->data.thoiLuong;
+
+            bool dieuKienDoi = giamDan ? (val1 < val2) : (val1 > val2);
+
+            if (dieuKienDoi) {
+                Phim temp = ptr1->data;
+                ptr1->data = ptr2->data;
+                ptr2->data = temp;
+                swapped = true;
+            }
+            ptr1 = ptr1->next;
+        }
+        lptr = ptr1;
+    } while (swapped);
+}
+
+// Menu điều phối các tiêu chí sắp xếp danh sách phim
+void hienThiMenuSapXep(NodePhim* headPhim) {
+    if (headPhim == nullptr) {
+        cout << "[!] Danh sach phim hien dang trong, chua co du lieu de sap xep!\n";
+        return;
+    }
+
+    cout << "\n--- SAP XEP DANH SACH PHIM ---\n";
+    cout << "1. Gia ve tang dan (Thap -> Cao)\n";
+    cout << "2. Gia ve giam dan (Cao -> Thap)\n";
+    cout << "3. Thoi luong tang dan (Ngan -> Dai)\n";
+    cout << "4. Thoi luong giam dan (Dai -> Ngan)\n";
+    cout << "0. Quay lai menu chinh\n";
+
+    string luaChon = nhapChuoi("Chon tuy chon (0-4): ");
+
+    if (luaChon == "0") {
+        cout << "=> Tro ve menu chinh.\n";
+        return;
+    }
+
+    bool daXuLy = true;
+    if (luaChon == "1") {
+        sapXepDanhSachPhim(headPhim, false, true);  // Giá vé tăng dần
+    } else if (luaChon == "2") {
+        sapXepDanhSachPhim(headPhim, true, true);   // Giá vé giảm dần
+    } else if (luaChon == "3") {
+        sapXepDanhSachPhim(headPhim, false, false); // Thời lượng tăng dần
+    } else if (luaChon == "4") {
+        sapXepDanhSachPhim(headPhim, true, false);  // Thời lượng giảm dần
+    } else {
+        cout << "=> [!] Tuy chon khong hop le!\n";
+        daXuLy = false;
+    }
+
+    if (daXuLy) {
+        ghiToanBoFile(FILE_DB, headPhim);
+        cout << "=> Da sap xep va DONG BO file thanh cong!\n";
+        xemDanhSachPhim(headPhim);
+    }
+}
+
+// ----------------------------------------------------------------
+// 7.7. NGHIỆP VỤ PHÒNG VÉ: ĐẶT VÉ & HỦY VÉ (TICKETING)
+// ----------------------------------------------------------------
+
+// Hiển thị trực quan sơ đồ 30 ghế (5 hàng x 6 cột) của 1 bộ phim
+void xemSoDoGhe(NodePhim* p) {
+    if (p == nullptr) return;
+
+    cout << "\n==================================================================\n";
+    cout << "  SO DO PHONG CHIEU: " << p->data.ten << " (" << p->data.ma << ")\n";
+    cout << "==================================================================\n";
+    cout << "                    [ MAN HINH CHIEU (SCREEN) ]                   \n";
+    cout << "------------------------------------------------------------------\n";
+    cout << "        Cot 1   Cot 2   Cot 3   Cot 4   Cot 5   Cot 6\n";
+
+    char tenHang = 'A';
+    for (int r = 0; r < SO_HANG; r++) {
+        cout << "Hang " << (char)(tenHang + r) << "  ";
+        for (int c = 0; c < SO_COT; c++) {
+            int soGhe = r * SO_COT + c + 1;
+            if (p->data.ghe[r][c].daDat) {
+                cout << " [ X]  ";
+            } else {
+                printf(" [%02d]  ", soGhe);
+            }
+        }
+        cout << "\n\n";
+    }
+    cout << "Chu thich: [So]: Ghe con trong (co the dat)  |  [ X]: Ghe da dat\n";
+    cout << "Gia ve   : " << (long long)p->data.giaVe << " VND / ghe\n";
+    cout << "------------------------------------------------------------------\n";
+}
+
+// Đặt vé xem phim: chọn phim -> xem ghế -> chọn ghế -> nhập khách -> cấp vé -> lưu CSDL
+void datVe(NodePhim* headPhim, int& veKeTiep) {
+    if (headPhim == nullptr) {
+        cout << "[!] He thong chua co phim nao de dat ve!\n";
+        return;
+    }
+
+    cout << "\n========================================\n";
+    cout << "           DAT VE XEM PHIM              \n";
+    cout << "========================================\n";
+
+    string maPhim = nhapChuoi("Nhap ma phim ban muon dat ve (VD: P01): ");
+    NodePhim* p = timPhimTheoMa(headPhim, maPhim);
+
+    if (p == nullptr) {
+        cout << "  [!] Khong tim thay phim co ma: " << maPhim << "\n";
+        return;
+    }
+
+    // Hiển thị sơ đồ ghế để khách dễ dàng lựa chọn
+    xemSoDoGhe(p);
+
+    int soGhe, r, c;
+    while (true) {
+        soGhe = nhapSoNguyen("Nhap so ghe ban muon dat (1 - 30): ", 1, TONG_GHE);
+        r = (soGhe - 1) / SO_COT;
+        c = (soGhe - 1) % SO_COT;
+
+        if (p->data.ghe[r][c].daDat) {
+            cout << "  [!] Ghe so " << soGhe << " DA CO NGUOI DAT! Vui long chon ghe khac.\n";
+        } else {
+            break;
+        }
+    }
+
+    cout << "\n--- Nhap thong tin khach hang ---\n";
+    string tenKhach = nhapChuoi("  + Ho ten khach hang: ");
+    string sdt      = nhapChuoi("  + So dien thoai: ");
+
+    int maVeMoi = veKeTiep++;
+    p->data.ghe[r][c].daDat = true;
+    p->data.ghe[r][c].ve    = { maVeMoi, tenKhach, sdt };
+
+    // Tự động đồng bộ xuống tệp tin cơ sở dữ liệu
+    ghiToanBoFile(FILE_DB, headPhim);
+
+    char hangGhe = 'A' + r;
+    int cotGhe   = c + 1;
+    cout << "\n========================================\n";
+    cout << "           DAT VE THANH CONG!           \n";
+    cout << "========================================\n";
+    cout << "  * Ma so ve  : #" << maVeMoi << "\n";
+    cout << "  * Ten phim  : " << p->data.ten << "\n";
+    cout << "  * Vi tri ghe: Hang " << hangGhe << ", Cot " << cotGhe << " (Ghe so " << soGhe << ")\n";
+    cout << "  * Khach hang: " << tenKhach << " - " << sdt << "\n";
+    cout << "  * Gia ve    : " << (long long)p->data.giaVe << " VND\n";
+    cout << "=> Da cap nhat ghe va dong bo vao file database!\n";
+    cout << "========================================\n";
+}
+
+// Hủy vé xem phim theo mã số vé
+void huyVe(NodePhim* headPhim) {
+    if (headPhim == nullptr) {
+        cout << "[!] Danh sach phim dang trong!\n";
+        return;
+    }
+
+    cout << "\n========================================\n";
+    cout << "             HUY VE XEM PHIM            \n";
+    cout << "========================================\n";
+
+    int maVeCanHuy = nhapSoNguyen("Nhap ma so ve can huy (VD: 1001, hoac 0 de thoat): ", 0, 9999999);
+    if (maVeCanHuy == 0) {
+        cout << "=> Da huy thao tac.\n";
+        return;
+    }
+
+    NodePhim* p = headPhim;
+    bool timThay = false;
+
+    while (p != nullptr && !timThay) {
+        for (int r = 0; r < SO_HANG; r++) {
+            for (int c = 0; c < SO_COT; c++) {
+                if (p->data.ghe[r][c].daDat && p->data.ghe[r][c].ve.soVe == maVeCanHuy) {
+                    timThay = true;
+                    int soGhe = r * SO_COT + c + 1;
+                    char hangGhe = 'A' + r;
+
+                    cout << "\n--- THONG TIN VE TIM THAY ---\n";
+                    cout << "  * Ma ve   : #" << maVeCanHuy << "\n";
+                    cout << "  * Phim    : " << p->data.ten << " (" << p->data.ma << ")\n";
+                    cout << "  * Vi tri  : Hang " << hangGhe << (c + 1) << " (Ghe " << soGhe << ")\n";
+                    cout << "  * Khach   : " << p->data.ghe[r][c].ve.tenKhach 
+                         << " (" << p->data.ghe[r][c].ve.sdt << ")\n";
+
+                    string xacNhan = nhapChuoi("\nBan co CHAC CHAN muon huy ve nay? (y/n): ");
+                    if (xacNhan == "y" || xacNhan == "Y") {
+                        p->data.ghe[r][c].daDat = false;
+                        p->data.ghe[r][c].ve    = { 0, "", "" };
+
+                        ghiToanBoFile(FILE_DB, headPhim);
+                        cout << "=> [Thanh cong] Da huy ve #" << maVeCanHuy 
+                             << " va tra ghe " << hangGhe << (c + 1) << " ve trang thai trong!\n";
+                    } else {
+                        cout << "=> Da huy thao tac. Ve van duoc giu nguyen!\n";
+                    }
+                    return;
+                }
+            }
+        }
+        p = p->next;
+    }
+
+    if (!timThay) {
+        cout << "  [!] Khong tim thay ve co ma #" << maVeCanHuy << " trong he thong!\n";
+    }
+}
+
+// Menu điều phối nghiệp vụ phòng vé (Chức năng 8)
+void hienMenuDatVeHuyVe(NodePhim* headPhim, int& veKeTiep) {
+    if (headPhim == nullptr) {
+        cout << "[!] Danh sach phim hien dang trong, vui long nhap phim truoc!\n";
+        return;
+    }
+
+    cout << "\n======== DAT VE & HUY VE XEM PHIM ========\n";
+    cout << "   1. Dat ve xem phim\n";
+    cout << "   2. Huy ve da dat\n";
+    cout << "   3. Xem so do ghe phong chieu\n";
+    cout << "   0. Quay lai menu chinh\n";
+    cout << "==========================================\n";
+
+    string chon = nhapChuoi("   Chon: ");
+    if (chon == "0") {
+        cout << "=> Tro ve menu chinh.\n";
+        return;
+    } else if (chon == "1") {
+        datVe(headPhim, veKeTiep);
+    } else if (chon == "2") {
+        huyVe(headPhim);
+    } else if (chon == "3") {
+        string maPhim = nhapChuoi("   Nhap ma phim can xem so do ghe (VD: P01): ");
+        NodePhim* p = timPhimTheoMa(headPhim, maPhim);
+        if (p == nullptr) {
+            cout << "  [!] Khong tim thay phim co ma: " << maPhim << "\n";
+        } else {
+            xemSoDoGhe(p);
+        }
+    } else {
+        cout << "[!] Tuy chon khong hop le!\n";
+    }
+}
+
+// ----------------------------------------------------------------
+// 7.8. CHỨC NĂNG 14: LỊCH SỬ THAO TÁC (DANH SÁCH LIÊN KẾT ĐƠN + FILE)
+// ----------------------------------------------------------------
+// Module lịch sử tách riêng hoàn toàn: các hàm chức năng gốc 1-8 KHÔNG
+// bị sửa đổi gì cả. Sau khi một hàm chức năng chạy xong, hàm main chỉ
+// gọi thêm ghiLichSu(...) một lần để lưu lại thao tác vừa thực hiện.
+
+// Lấy thời gian hiện tại của hệ thống, trả về chuỗi dạng "DD/MM/YYYY HH:MM:SS"
+string layThoiGianHienTai() {
+    time_t bayGio = time(nullptr);
+    tm* tg = localtime(&bayGio);
+    char buf[32];
+    strftime(buf, sizeof(buf), "%d/%m/%Y %H:%M:%S", tg);
+    return string(buf);
+}
+
+// Đọc lịch sử thao tác từ file history.txt khi khởi động chương trình.
+// File lưu theo thứ tự cũ nhất -> mới nhất, mỗi thao tác một dòng dạng
+// "DD/MM/YYYY HH:MM:SS | Noi dung thao tac". Khi nạp vào danh sách liên kết
+// bằng cách chèn đầu, danh sách sẽ tự thành thứ tự mới nhất -> cũ nhất.
+void docLichSu(LichSuThaoTac& lichSu) {
+    ifstream f(FILE_LICH_SU);
+    if (!f.is_open()) return;
+
+    string dong;
+    while (getline(f, dong)) {
+        if (!dong.empty() && dong.back() == '\r') dong.pop_back();
+        if (dong.empty()) continue;
+
+        // Tách dòng thành 2 phần tại dấu " | ": trước là thời gian, sau là nội dung
+        string thoiGian = "", moTa = dong;
+        size_t viTri = dong.find(" | ");
+        if (viTri != string::npos) {
+            thoiGian = dong.substr(0, viTri);
+            moTa     = dong.substr(viTri + 3);
+        }
+
+        NodeLichSu* node = new NodeLichSu{ thoiGian, moTa, lichSu.dau };
+        lichSu.dau = node;
+        lichSu.soLuong++;
+    }
+    f.close();
+}
+
+// Ghi nhận một thao tác vừa thực hiện: chèn node mới vào ĐẦU danh sách lịch sử
+// và ghi thêm đúng 1 dòng vào CUỐI file history.txt.
+// Nhờ chèn đầu, thao tác mới nhất luôn nằm ở đầu -> khi xem lịch sử chỉ cần
+// duyệt danh sách từ đầu là ra đúng thứ tự mới nhất -> cũ nhất, và lịch sử
+// lưu được TOÀN BỘ thao tác, không bị giới hạn số lượng.
+void ghiLichSu(LichSuThaoTac& lichSu, string moTa) {
+    string thoiGian = layThoiGianHienTai(); // Mốc thời gian ngay lúc thao tác xảy ra
+
+    NodeLichSu* node = new NodeLichSu{ thoiGian, moTa, lichSu.dau };
+    lichSu.dau = node;
+    lichSu.soLuong++;
+
+    ofstream f(FILE_LICH_SU, ios::app);
+    if (f.is_open()) {
+        f << thoiGian << " | " << moTa << "\n";
+        f.close();
+    }
+}
+
+// Hiển thị toàn bộ lịch sử thao tác, in từ MỚI NHẤT -> CŨ NHẤT (Chức năng 14)
+void xemLichSu(const LichSuThaoTac& lichSu) {
+    cout << "\n========================================\n";
+    cout << "         LICH SU THAO TAC               \n";
+    cout << "========================================\n";
+
+    if (lichSu.dau == nullptr) {
+        cout << "[!] Chua co thao tac nao duoc ghi nhan trong phien lam viec nay!\n";
+        return;
+    }
+
+    cout << "Tong cong: " << lichSu.soLuong << " thao tac da thuc hien\n";
+    cout << "----------------------------------------\n";
+    int stt = 1;
+    for (NodeLichSu* p = lichSu.dau; p != nullptr; p = p->next) {
+        cout << "  " << stt << ". ";
+        if (!p->thoiGian.empty()) {
+            cout << "[" << p->thoiGian << "] ";
+        }
+        cout << p->moTa;
+        if (stt == 1) {
+            cout << "   <- (moi nhat)";
+        }
+        cout << "\n";
+        stt++;
+    }
+    cout << "========================================\n";
+}
+
+// Giải phóng toàn bộ node của danh sách lịch sử khi thoát chương trình
+void giaiPhongLichSu(LichSuThaoTac& lichSu) {
+    while (lichSu.dau != nullptr) {
+        NodeLichSu* del = lichSu.dau;
+        lichSu.dau = lichSu.dau->next;
+        delete del;
+    }
+    lichSu.soLuong = 0;
+}
+
+// ----------------------------------------------------------------
+// 7.9. CHỨC NĂNG 10: HÀNG ĐỢI ĐẶT VÉ (QUEUE - FIFO)
+// ----------------------------------------------------------------
+// Khách tới quầy xếp hàng chờ mua vé: ai tới trước được phục vụ trước.
+// Module tách riêng, chỉ tái sử dụng các hàm tiện ích sẵn có
+// (timPhimTheoMa, xemSoDoGhe, nhapChuoi, nhapSoNguyen, ghiToanBoFile).
+
+// Thêm một khách vào CUỐI hàng đợi (Enqueue)
+void themVaoHangDoi(HangDoi& hangDoi, KhachCho khach) {
+    NodeHangDoi* node = new NodeHangDoi{ khach, nullptr };
+    if (hangDoi.rear == nullptr) {
+        hangDoi.front = hangDoi.rear = node;
+    } else {
+        hangDoi.rear->next = node;
+        hangDoi.rear = node;
+    }
+    hangDoi.soLuong++;
+}
+
+// Lấy khách ở ĐẦU hàng đợi ra để phục vụ (Dequeue). Trả false nếu hàng trống.
+bool layKhachDauHang(HangDoi& hangDoi, KhachCho& khachRa) {
+    if (hangDoi.front == nullptr) return false;
+    NodeHangDoi* del = hangDoi.front;
+    khachRa = del->data;
+    hangDoi.front = del->next;
+    if (hangDoi.front == nullptr) hangDoi.rear = nullptr;
+    delete del;
+    hangDoi.soLuong--;
+    return true;
+}
+
+// Đọc hàng đợi từ file hang_doi.txt (mỗi dòng: Ten|SDT|MaPhim, đầu hàng trước)
+void docHangDoi(HangDoi& hangDoi) {
+    ifstream f(FILE_HANG_DOI);
+    if (!f.is_open()) return;
+
+    string dong;
+    while (getline(f, dong)) {
+        if (!dong.empty() && dong.back() == '\r') dong.pop_back();
+        if (dong.empty()) continue;
+
+        stringstream ss(dong);
+        KhachCho khach;
+        if (getline(ss, khach.tenKhach, '|') &&
+            getline(ss, khach.sdt, '|') &&
+            getline(ss, khach.maPhim)) {
+            themVaoHangDoi(hangDoi, khach);
+        }
+    }
+    f.close();
+}
+
+// Ghi toàn bộ hàng đợi xuống file hang_doi.txt theo thứ tự từ đầu hàng
+void ghiFileHangDoi(const HangDoi& hangDoi) {
+    ofstream f(FILE_HANG_DOI);
+    for (NodeHangDoi* p = hangDoi.front; p != nullptr; p = p->next) {
+        f << p->data.tenKhach << "|" << p->data.sdt << "|" << p->data.maPhim << "\n";
+    }
+    f.close();
+}
+
+// Giải phóng toàn bộ node của hàng đợi khi thoát chương trình
+void giaiPhongHangDoi(HangDoi& hangDoi) {
+    KhachCho khach;
+    while (layKhachDauHang(hangDoi, khach)) {
+        // Lấy ra liên tục cho tới khi hàng trống, node được delete trong hàm lấy
+    }
+}
+
+// Thao tác 1 (menu con): một khách mới tới xếp hàng
+void khachXepHang(HangDoi& hangDoi, NodePhim* headPhim) {
+    cout << "\n--- KHACH XEP HANG CHO MUA VE ---\n";
+    KhachCho khach;
+    khach.tenKhach = nhapChuoi("  + Ho ten khach hang (nhap 0 de huy): ");
+    if (khach.tenKhach == "0") {
+        cout << "=> Da huy xep hang.\n";
+        return;
+    }
+    khach.sdt    = nhapChuoi("  + So dien thoai: ");
+    khach.maPhim = nhapChuoi("  + Nhap ma phim muon xem (VD: P01): ");
+
+    if (timPhimTheoMa(headPhim, khach.maPhim) == nullptr) {
+        cout << "  [!] Khong tim thay phim co ma: " << khach.maPhim << " -> Khong the xep hang!\n";
+        return;
+    }
+
+    themVaoHangDoi(hangDoi, khach);
+    ghiFileHangDoi(hangDoi);
+    cout << "=> [Thanh cong] Khach " << khach.tenKhach << " da xep hang cho phim " << khach.maPhim
+         << ". Vi tri: thu " << hangDoi.soLuong << " trong hang doi.\n";
+}
+
+// Thao tác 2 (menu con): phục vụ khách đầu hàng - chọn ghế và cấp vé
+void phucVuKhach(HangDoi& hangDoi, NodePhim* headPhim, int& veKeTiep) {
+    KhachCho khach;
+    if (!layKhachDauHang(hangDoi, khach)) {
+        cout << "[!] Hang doi dang trong, hien khong co khach nao dang cho!\n";
+        return;
+    }
+    ghiFileHangDoi(hangDoi); // Đồng bộ: khách đã rời hàng
+
+    cout << "\n--- PHUC VU KHACH: " << khach.tenKhach << " (" << khach.sdt << ") - Phim " << khach.maPhim << " ---\n";
+
+    NodePhim* p = timPhimTheoMa(headPhim, khach.maPhim);
+    if (p == nullptr) {
+        cout << "  [!] Phim " << khach.maPhim << " da bi xoa khoi he thong trong luc khach cho!\n";
+        cout << "  -> Khach " << khach.tenKhach << " da duoc dua ra khoi hang doi.\n";
+        return;
+    }
+
+    xemSoDoGhe(p);
+
+    int soGhe, r, c;
+    while (true) {
+        soGhe = nhapSoNguyen("Nhap so ghe khach muon dat (1 - 30): ", 1, TONG_GHE);
+        r = (soGhe - 1) / SO_COT;
+        c = (soGhe - 1) % SO_COT;
+
+        if (p->data.ghe[r][c].daDat) {
+            cout << "  [!] Ghe so " << soGhe << " DA CO NGUOI DAT! Vui long chon ghe khac.\n";
+        } else {
+            break;
+        }
+    }
+
+    int maVeMoi = veKeTiep++;
+    p->data.ghe[r][c].daDat = true;
+    p->data.ghe[r][c].ve    = { maVeMoi, khach.tenKhach, khach.sdt };
+
+    ghiToanBoFile(FILE_DB, headPhim);
+
+    char hangGhe = 'A' + r;
+    int cotGhe   = c + 1;
+    cout << "\n========================================\n";
+    cout << "           DAT VE THANH CONG!           \n";
+    cout << "========================================\n";
+    cout << "  * Ma so ve  : #" << maVeMoi << "\n";
+    cout << "  * Ten phim  : " << p->data.ten << "\n";
+    cout << "  * Vi tri ghe: Hang " << hangGhe << ", Cot " << cotGhe << " (Ghe so " << soGhe << ")\n";
+    cout << "  * Khach hang: " << khach.tenKhach << " - " << khach.sdt << "\n";
+    cout << "  * Gia ve    : " << (long long)p->data.giaVe << " VND\n";
+    cout << "=> Da cap nhat ghe va dong bo vao file database!\n";
+    cout << "========================================\n";
+}
+
+// Menu điều phối chức năng 10 - Hàng đợi đặt vé
+void hienMenuHangDoi(HangDoi& hangDoi, NodePhim* headPhim, int& veKeTiep) {
+    if (headPhim == nullptr) {
+        cout << "[!] He thong chua co phim nao, khong the xep hang!\n";
+        return;
+    }
+
+    cout << "\n======== HANG DOI DAT VE (QUEUE) ========\n";
+    cout << "   1. Khach xep hang cho mua ve\n";
+    cout << "   2. Phuc vu khach tiep theo\n";
+    cout << "   3. Xem khach tiep theo\n";
+    cout << "   4. Xem toan bo hang doi\n";
+    cout << "   0. Quay lai menu chinh\n";
+    cout << "==========================================\n";
+
+    string chon = nhapChuoi("   Chon: ");
+    if (chon == "0") {
+        cout << "=> Tro ve menu chinh.\n";
+    } else if (chon == "1") {
+        khachXepHang(hangDoi, headPhim);
+    } else if (chon == "2") {
+        phucVuKhach(hangDoi, headPhim, veKeTiep);
+    } else if (chon == "3") {
+        if (hangDoi.front == nullptr) {
+            cout << "[!] Hang doi dang trong!\n";
+        } else {
+            KhachCho k = hangDoi.front->data;
+            cout << "=> Khach tiep theo: " << k.tenKhach << " (" << k.sdt << ") - Phim " << k.maPhim << "\n";
+        }
+    } else if (chon == "4") {
+        if (hangDoi.front == nullptr) {
+            cout << "[!] Hang doi dang trong!\n";
+        } else {
+            cout << "\n--- DANH SACH KHACH DANG CHO (" << hangDoi.soLuong << " khach) ---\n";
+            int stt = 1;
+            for (NodeHangDoi* p = hangDoi.front; p != nullptr; p = p->next) {
+                cout << "  " << stt << ". " << p->data.tenKhach << " (" << p->data.sdt
+                     << ") - Phim " << p->data.maPhim << "\n";
+                stt++;
+            }
+        }
+    } else {
+        cout << "[!] Tuy chon khong hop le!\n";
+    }
+}
+
+// ================================================================
+// 8. MENU & ĐIỀU PHỐI HỆ THỐNG (MAIN & CONTROL FLOW)
+// ================================================================
+
+// Xuất giao diện Menu chính
+void hienThiMenu() {
+    cout << "\n===== QUAN LY DAT VE XEM PHIM =====\n";
+    cout << "  1. Them danh sach phim moi\n";
+    cout << "  2. Xem danh sach phim\n";
+    cout << "  3. Tim kiem phim\n";
+    cout << "  4. Xoa phim\n";
+    cout << "  5. Cap nhat thong tin phim\n";
+    cout << "  6. Sap xep danh sach phim\n";
+    cout << "  7. Xem so do ghe phong chieu\n";
+    cout << "  8. Dat ve & Huy ve xem phim\n";
+    cout << "  10. Hang doi dat ve (Queue)\n";
+    cout << "  14. Lich su thao tac\n";
+    cout << "  0. Thoat\n";
+    cout << "====================================\n";
+    cout << "Chon: ";
+}
+
+// Khởi tạo hệ thống, nạp dữ liệu từ CSDL vào RAM khi bật ứng dụng
+void khoiTaoHeThong(const string& file, NodePhim*& head, int& veKeTiep) {
+    cout << "[System] Dang khoi dong va kiem tra co so du lieu...\n";
+
+    if (kiemTraDBTrong(file)) {
+        cout << "[Thong bao] Co so du lieu hien dang TRONG (chua co phim nao)!\n";
+        cout << "-> He thong san sang de ban nhap danh sach phim ban dau.\n";
+        return;
+    }
+
+    docDanhSachPhim(file, head, veKeTiep);
+
+    int soPhim = 0;
+    NodePhim* p = head;
+    while (p != nullptr) {
+        soPhim++;
+        p = p->next;
+    }
+
+    cout << "[Init] Da keo thanh cong " << soPhim << " phim co san tu Database len RAM!\n";
+}
+
+// Hàm thực thi chính của chương trình
+int main() {
+    NodePhim* headPhim = nullptr; // Con trỏ đầu danh sách liên kết
+    int veKeTiep = 1001;          // Bộ đếm mã số vé tự tăng
+    LichSuThaoTac lichSu;         // Lịch sử thao tác (Chức năng 14)
+    HangDoi hangDoi;              // Hàng đợi khách chờ mua vé (Chức năng 10)
+
+    // Bước 1: Khởi tạo hệ thống
+    khoiTaoHeThong(FILE_DB, headPhim, veKeTiep);
+
+    // Nạp lịch sử thao tác đã lưu trong file history.txt từ các phiên trước
+    docLichSu(lichSu);
+
+    // Nạp hàng đợi khách còn đang chờ từ phiên trước (nếu có)
+    docHangDoi(hangDoi);
+    if (hangDoi.soLuong > 0) {
+        cout << "[Init] Co " << hangDoi.soLuong << " khach dang xep hang cho tu phien truoc!\n";
+    }
+
+    // Bước 2: Vòng lặp Menu chính
+    string chon;
+    while (true) {
+        hienThiMenu();
+        getline(cin, chon);
+
+        if (chon == "1") {
+            nhapDanhSachPhim(headPhim);
+            ghiLichSu(lichSu, "Them danh sach phim moi");
+        }
+        else if (chon == "2") {
+            if (headPhim == nullptr) {
+                cout << "[!] Danh sach hien dang trong, vui long nhap phim truoc!\n";
+            } else {
+                xemDanhSachPhim(headPhim);
+                ghiLichSu(lichSu, "Xem danh sach phim");
+            }
+        }
+        else if (chon == "3") {
+            hienMenuTimKiem(headPhim);
+            ghiLichSu(lichSu, "Tim kiem phim");
+        }
+        else if (chon == "4") {
+            hienMenuXoaPhim(headPhim);
+            ghiLichSu(lichSu, "Xoa phim");
+        }
+        else if (chon == "5") {
+            if (headPhim == nullptr) {
+                cout << "[!] Danh sach hien dang trong!\n";
+            } else {
+                capNhatThongTinPhim(headPhim);
+                ghiLichSu(lichSu, "Cap nhat thong tin phim");
+            }
+        }
+        else if (chon == "6") {
+            if (headPhim == nullptr) {
+                cout << "[!] Danh sach hien dang trong!\n";
+            } else {
+                hienThiMenuSapXep(headPhim);
+                ghiLichSu(lichSu, "Sap xep danh sach phim");
+            }
+        }
+        else if (chon == "7") {
+            if (headPhim == nullptr) {
+                cout << "[!] Danh sach hien dang trong!\n";
+            } else {
+                string maPhim = nhapChuoi("Nhap ma phim can xem so do ghe (VD: P01): ");
+                NodePhim* p = timPhimTheoMa(headPhim, maPhim);
+                if (p == nullptr) {
+                    cout << "  [!] Khong tim thay phim co ma: " << maPhim << "\n";
+                } else {
+                    xemSoDoGhe(p);
+                    ghiLichSu(lichSu, "Xem so do ghe phim [" + p->data.ma + " - " + p->data.ten + "]");
+                }
+            }
+        }
+        else if (chon == "8") {
+            hienMenuDatVeHuyVe(headPhim, veKeTiep);
+            ghiLichSu(lichSu, "Dat ve & Huy ve xem phim");
+        }
+        else if (chon == "10") {
+            hienMenuHangDoi(hangDoi, headPhim, veKeTiep);
+            ghiLichSu(lichSu, "Hang doi dat ve (Queue)");
+        }
+        else if (chon == "14") {
+            xemLichSu(lichSu);
+        }
+        else if (chon == "0") {
+            ghiToanBoFile(FILE_DB, headPhim);
+            cout << "Da dong bo du lieu an toan xuong dia. Tam biet!\n";
+            break;
+        }
+        else {
+            cout << "[!] Lua chon khong hop le, vui long chon lai!\n";
+        }
+    }
+
+    // Bước 3: Giải phóng bộ nhớ RAM trước khi thoát
+    giaiPhong(headPhim);
+    giaiPhongLichSu(lichSu);
+    giaiPhongHangDoi(hangDoi);
+
+    return 0;
+}
