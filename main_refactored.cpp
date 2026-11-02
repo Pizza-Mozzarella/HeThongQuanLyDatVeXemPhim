@@ -1029,8 +1029,6 @@ void khoiTaoCay(Tree& root) {
     root = nullptr;
 }
 
-// So sánh từng ký tự sau khi chuẩn hóa bằng hàm dùng chung.
-// Trả về -1 nếu a < b, 0 nếu trùng mã, 1 nếu a > b.
 int soSanhMa(string a, string b) {
     a = chuyenChuThuong(a);
     b = chuyenChuThuong(b);
@@ -1047,8 +1045,6 @@ int soSanhMa(string a, string b) {
     return 1;
 }
 
-// 1: thêm thành công; 0: trùng mã; -1: con trỏ phim không hợp lệ.
-// Mỗi node cây chỉ giữ con trỏ, linked list vẫn sở hữu dữ liệu phim.
 int chenNodeBST(NodePhim* phim, Tree& root) {
     if (phim == nullptr) return -1;
 
@@ -1063,7 +1059,6 @@ int chenNodeBST(NodePhim* phim, Tree& root) {
     return 1;
 }
 
-// Chỉ giải phóng node cây, không xóa root->phim của linked list.
 void giaiPhongCay(Tree& root) {
     if (root == nullptr) return;
 
@@ -1073,9 +1068,6 @@ void giaiPhongCay(Tree& root) {
     root = nullptr;
 }
 
-// Cần khởi tạo root trước lần gọi đầu tiên. Không thay đổi head/next.
-// Trả về 1 nếu thành công (kể cả danh sách rỗng).
-// Nếu gặp lỗi chèn, dọn sạch cây và trả về mã lỗi của chenNodeBST.
 int taoCayTuDanhSach(NodePhim* head, Tree& root) {
     giaiPhongCay(root);
     NodePhim* p = head;
@@ -1092,7 +1084,6 @@ int taoCayTuDanhSach(NodePhim* head, Tree& root) {
     return 1;
 }
 
-// Tìm chính xác mã phim, không phân biệt hoa/thường.
 NodePhim* timPhimBST(const string& ma, Tree root) {
     if (root == nullptr) return nullptr;
 
@@ -1102,7 +1093,6 @@ NodePhim* timPhimBST(const string& ma, Tree root) {
     return timPhimBST(ma, root->right);
 }
 
-// Duyệt mã tăng dần, dùng inTieuDeBang() trước khi gọi nếu cần xem cây.
 void duyetLNR(Tree root) {
     if (root == nullptr) return;
 
@@ -1111,8 +1101,6 @@ void duyetLNR(Tree root) {
     duyetLNR(root->right);
 }
 
-// BST - Cho phép nhập riêng phần số theo dạng mã P01, P02, ...
-// Giữ nguyên chuỗi có chữ để vẫn tìm được các mã do người dùng tự đặt.
 string chuanHoaMaTimKiem(string ma) {
     if (ma.empty()) return ma;
     for (char c : ma) {
@@ -1123,7 +1111,6 @@ string chuanHoaMaTimKiem(string ma) {
     return "P" + ma;
 }
 
-// Điều phối chức năng 12: nhập mã, tìm trên cây và in kết quả.
 void hienMenuTimKiemNhanh(Tree root) {
     if (root == nullptr) {
         cout << "[!] Chua co cay tim kiem. Vui long kiem tra danh sach phim!\n";
@@ -1133,7 +1120,6 @@ void hienMenuTimKiemNhanh(Tree root) {
     cout << "\n======== TIM KIEM NHANH THEO MA PHIM ========\n";
     string ma = nhapChuoi("   Nhap ma phim hoac phan so (VD: P01, 01, 1): ");
     NodePhim* phim = timPhimBST(ma, root);
-    // BST - Ưu tiên mã nhập chính xác; nếu chưa thấy mới thử mã Pxx.
     if (phim == nullptr) {
         string maChuan = chuanHoaMaTimKiem(ma);
         if (maChuan != ma) {
@@ -1194,7 +1180,6 @@ ThongKePhim thuThapThongKe(NodePhim* head) {
 
 void inDongThongKe(const Phim& phim, int soVe) {
     double doanhThu = soVe * phim.giaVe;
-    // Dùng 100.0 để phép chia giữ phần thập phân, ví dụ 2/30 = 6.67%.
     double tyLeLapDay = soVe * 100.0 / TONG_GHE;
     string veDaDat = to_string(soVe) + "/" + to_string(TONG_GHE);
     printf("%-8s %-40s %-12s %9.2f%% %20.2f\n",
@@ -1202,7 +1187,6 @@ void inDongThongKe(const Phim& phim, int soVe) {
            tyLeLapDay, doanhThu);
 }
 
-// Mỗi phim đồng hạng nằm trên một dòng trong cùng nhóm thống kê.
 void inHangTongKet(const string& tieuChi, double giaTri, const string& donVi, const string& dsPhim) {
     stringstream danhSach(dsPhim);
     string tenPhim;
@@ -1218,8 +1202,6 @@ void inHangTongKet(const string& tieuChi, double giaTri, const string& donVi, co
          << '+' << string(52, '-') << "+\n";
 }
 
-// Insertion Sort trên mảng hiển thị, không đổi data/next của linked list.
-// Mọi phim có 30 ghế nên thứ tự số vé cũng là thứ tự tỷ lệ lấp đầy.
 void sapXepThongKeTheoLapDay(DongThongKe* danhSach, int soPhim) {
     for (int i = 1; i < soPhim; i++) {
         DongThongKe dong = danhSach[i];
@@ -1233,7 +1215,6 @@ void sapXepThongKeTheoLapDay(DongThongKe* danhSach, int soPhim) {
 }
 
 // Lượt 2: gom dòng hiển thị và tên phim đồng hạng, sau đó sắp mảng và in.
-// Linked list vẫn được duyệt hai lượt, không sửa dữ liệu hay cấu trúc BST.
 void inPhimTheoThongKe(NodePhim* head, const ThongKePhim& thongKe) {
     printf("\n%-8s %-40s %-12s %10s %20s\n",
            "Ma", "Ten phim", "Ve da dat", "Lap day", "Doanh thu (VND)");
@@ -1249,7 +1230,6 @@ void inPhimTheoThongKe(NodePhim* head, const ThongKePhim& thongKe) {
         danhSach[soPhim++] = {p, soVe};
 
         string tenPhim = p->data.ma + " - " + p->data.ten + "\n";
-        // Các if độc lập giữ đủ phim đồng hạng và phim thuộc nhiều nhóm.
         if (soVe == thongKe.veNhieuNhat) phimNhieuVe += tenPhim;
         if (soVe == thongKe.veItNhat) phimItVe += tenPhim;
         if (doanhThu == thongKe.doanhThuCaoNhat) phimDoanhThuCao += tenPhim;
@@ -1279,7 +1259,6 @@ void inPhimTheoThongKe(NodePhim* head, const ThongKePhim& thongKe) {
     inHangTongKet("Doanh thu thap nhat", thongKe.doanhThuThapNhat, "VND", phimDoanhThuThap);
 }
 
-// Chỉ đọc linked list, không ghi database hay dựng lại BST.
 void hienThongKePhim(NodePhim* headPhim) {
     if (headPhim == nullptr) {
         cout << "[!] Danh sach phim hien dang trong, chua co du lieu thong ke!\n";
