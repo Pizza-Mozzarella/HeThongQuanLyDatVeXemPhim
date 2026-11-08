@@ -1,4 +1,4 @@
-#P01|Avatar: The Way of Water|Khoa Hoc Vien Tuong|190|95000
+#P01|Avatar: The Way of Water|Khoa Hoc Vien Tuong|190|10000
 01|X|1013|vuongquocthai|123
 02|X|1014|abc|313
 03|X|1001|Nguyen Van An|0912345671
