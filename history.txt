@@ -1,1 +1,5 @@
 08/11/2026 13:55:32 | Cap nhat thong tin phim
+08/11/2026 23:32:25 | Them danh sach phim moi
+08/11/2026 23:32:44 | Undo thao tac
+08/11/2026 23:32:51 | Redo thao tac
+08/11/2026 23:33:00 | Thong ke dat ve
