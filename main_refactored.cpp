@@ -57,6 +57,32 @@ struct NodePhim {
     NodePhim* next;   // Con trỏ liên kết trỏ tới node kế tiếp
 };
 
+// Cấu trúc node BST
+struct NodeBST {
+    NodePhim* phim;   // Trỏ đến node phim trong linked list
+    NodeBST* left;
+    NodeBST* right;
+};
+
+typedef NodeBST* Tree;
+
+// Thống kê - Lưu các tổng và mức cao/thấp, không sao chép dữ liệu phim.
+struct ThongKePhim {
+    int tongPhim;
+    int tongVe;
+    double tongDoanhThu;
+    int veNhieuNhat;
+    int veItNhat;
+    double doanhThuCaoNhat;
+    double doanhThuThapNhat;
+};
+
+// Dòng hiển thị tạm: chỉ giữ con trỏ phim và số vé đã đếm.
+struct DongThongKe {
+    NodePhim* phim;
+    int soVe;
+};
+
 // ================================================================
 // 4. KHAI BÁO NGUYÊN MẪU HÀM (FUNCTION PROTOTYPES)
 // ================================================================
@@ -111,6 +137,26 @@ void xemSoDoGhe(NodePhim* p);
 void datVe(NodePhim* headPhim, int& veKeTiep);
 void huyVe(NodePhim* headPhim);
 void hienMenuDatVeHuyVe(NodePhim* headPhim, int& veKeTiep);
+
+// BST - Chức năng 12: Tìm kiếm nhanh theo mã phim
+void khoiTaoCay(Tree& root);
+int soSanhMa(string a, string b);
+int chenNodeBST(NodePhim* phim, Tree& root);
+void giaiPhongCay(Tree& root);
+int taoCayTuDanhSach(NodePhim* head, Tree& root);
+NodePhim* timPhimBST(const string& ma, Tree root);
+string chuanHoaMaTimKiem(string ma);
+void duyetLNR(Tree root);
+void hienMenuTimKiemNhanh(Tree root);
+
+// Thống kê - Chức năng 11: Thống kê đặt vé và tỷ lệ lấp đầy
+int demVeDaDat(const Phim& phim);
+ThongKePhim thuThapThongKe(NodePhim* head);
+void inDongThongKe(const Phim& phim, int soVe);
+void sapXepThongKeTheoLapDay(DongThongKe* danhSach, int soPhim);
+void inHangTongKet(const string& tieuChi, double giaTri, const string& donVi, const string& dsPhim);
+void inPhimTheoThongKe(NodePhim* head, const ThongKePhim& thongKe);
+void hienThongKePhim(NodePhim* headPhim);
 
 // --- 4.4. Hàm điều khiển hệ thống & Menu ---
 void hienThiMenu();
@@ -975,6 +1021,260 @@ void hienMenuDatVeHuyVe(NodePhim* headPhim, int& veKeTiep) {
     }
 }
 
+// ----------------------------------------------------------------
+// 7.12. TÌM KIẾM NHANH THEO MÃ PHIM (BST)
+// ----------------------------------------------------------------
+
+void khoiTaoCay(Tree& root) {
+    root = nullptr;
+}
+
+int soSanhMa(string a, string b) {
+    a = chuyenChuThuong(a);
+    b = chuyenChuThuong(b);
+    int i = 0;
+
+    while (a[i] != '\0' && b[i] != '\0') {
+        if (a[i] < b[i]) return -1;
+        if (a[i] > b[i]) return 1;
+        i++;
+    }
+
+    if (a[i] == '\0' && b[i] == '\0') return 0;
+    if (a[i] == '\0') return -1;
+    return 1;
+}
+
+int chenNodeBST(NodePhim* phim, Tree& root) {
+    if (phim == nullptr) return -1;
+
+    if (root != nullptr) {
+        int k = soSanhMa(phim->data.ma, root->phim->data.ma);
+        if (k == 0) return 0;
+        if (k < 0) return chenNodeBST(phim, root->left);
+        return chenNodeBST(phim, root->right);
+    }
+
+    root = new NodeBST{phim, nullptr, nullptr};
+    return 1;
+}
+
+void giaiPhongCay(Tree& root) {
+    if (root == nullptr) return;
+
+    giaiPhongCay(root->left);
+    giaiPhongCay(root->right);
+    delete root;
+    root = nullptr;
+}
+
+int taoCayTuDanhSach(NodePhim* head, Tree& root) {
+    giaiPhongCay(root);
+    NodePhim* p = head;
+
+    while (p != nullptr) {
+        int k = chenNodeBST(p, root);
+        if (k != 1) {
+            giaiPhongCay(root);
+            return k;
+        }
+        p = p->next;
+    }
+
+    return 1;
+}
+
+NodePhim* timPhimBST(const string& ma, Tree root) {
+    if (root == nullptr) return nullptr;
+
+    int k = soSanhMa(ma, root->phim->data.ma);
+    if (k == 0) return root->phim;
+    if (k < 0) return timPhimBST(ma, root->left);
+    return timPhimBST(ma, root->right);
+}
+
+void duyetLNR(Tree root) {
+    if (root == nullptr) return;
+
+    duyetLNR(root->left);
+    inDongPhim(root->phim->data);
+    duyetLNR(root->right);
+}
+
+string chuanHoaMaTimKiem(string ma) {
+    if (ma.empty()) return ma;
+    for (char c : ma) {
+        if (c < '0' || c > '9') return ma;
+    }
+
+    if (ma.size() == 1) return "P0" + ma;
+    return "P" + ma;
+}
+
+void hienMenuTimKiemNhanh(Tree root) {
+    if (root == nullptr) {
+        cout << "[!] Chua co cay tim kiem. Vui long kiem tra danh sach phim!\n";
+        return;
+    }
+
+    cout << "\n======== TIM KIEM NHANH THEO MA PHIM ========\n";
+    string ma = nhapChuoi("   Nhap ma phim hoac phan so (VD: P01, 01, 1): ");
+    NodePhim* phim = timPhimBST(ma, root);
+    if (phim == nullptr) {
+        string maChuan = chuanHoaMaTimKiem(ma);
+        if (maChuan != ma) {
+            phim = timPhimBST(maChuan, root);
+        }
+    }
+
+    if (phim == nullptr) {
+        cout << "[!] Khong tim thay phim co ma: " << ma << "\n";
+        return;
+    }
+
+    inTieuDeBang();
+    inDongPhim(phim->data);
+    cout << "=> Tim thay phim co ma: " << phim->data.ma << "\n";
+}
+
+// ----------------------------------------------------------------
+// 7.11. THỐNG KÊ ĐẶT VÉ & TỶ LỆ LẤP ĐẦY
+// ----------------------------------------------------------------
+
+int demVeDaDat(const Phim& phim) {
+    int soVe = 0;
+    for (int r = 0; r < SO_HANG; r++) {
+        for (int c = 0; c < SO_COT; c++) {
+            if (phim.ghe[r][c].daDat) soVe++;
+        }
+    }
+    return soVe;
+}
+
+// Lượt 1: tính tổng và khởi tạo các mức cao/thấp từ phim đầu tiên.
+ThongKePhim thuThapThongKe(NodePhim* head) {
+    ThongKePhim thongKe{};
+    NodePhim* p = head;
+
+    while (p != nullptr) {
+        int soVe = demVeDaDat(p->data);
+        double doanhThu = soVe * p->data.giaVe;
+
+        if (thongKe.tongPhim == 0) {
+            thongKe.veNhieuNhat = thongKe.veItNhat = soVe;
+            thongKe.doanhThuCaoNhat = thongKe.doanhThuThapNhat = doanhThu;
+        } else {
+            if (soVe > thongKe.veNhieuNhat) thongKe.veNhieuNhat = soVe;
+            if (soVe < thongKe.veItNhat) thongKe.veItNhat = soVe;
+            if (doanhThu > thongKe.doanhThuCaoNhat) thongKe.doanhThuCaoNhat = doanhThu;
+            if (doanhThu < thongKe.doanhThuThapNhat) thongKe.doanhThuThapNhat = doanhThu;
+        }
+
+        thongKe.tongPhim++;
+        thongKe.tongVe += soVe;
+        thongKe.tongDoanhThu += doanhThu;
+        p = p->next;
+    }
+    return thongKe;
+}
+
+void inDongThongKe(const Phim& phim, int soVe) {
+    double doanhThu = soVe * phim.giaVe;
+    double tyLeLapDay = soVe * 100.0 / TONG_GHE;
+    string veDaDat = to_string(soVe) + "/" + to_string(TONG_GHE);
+    printf("%-8s %-40s %-12s %9.2f%% %20.2f\n",
+           phim.ma.c_str(), phim.ten.c_str(), veDaDat.c_str(),
+           tyLeLapDay, doanhThu);
+}
+
+void inHangTongKet(const string& tieuChi, double giaTri, const string& donVi, const string& dsPhim) {
+    stringstream danhSach(dsPhim);
+    string tenPhim;
+    if (!getline(danhSach, tenPhim)) tenPhim = "-";
+
+    int soLe = (donVi == "VND") ? 2 : 0;
+    printf("| %-26s | %14.*f %-4s | %-50s |\n",
+           tieuChi.c_str(), soLe, giaTri, donVi.c_str(), tenPhim.c_str());
+    while (getline(danhSach, tenPhim)) {
+        printf("| %-26s | %-19s | %-50s |\n", "", "", tenPhim.c_str());
+    }
+    cout << '+' << string(28, '-') << '+' << string(21, '-')
+         << '+' << string(52, '-') << "+\n";
+}
+
+void sapXepThongKeTheoLapDay(DongThongKe* danhSach, int soPhim) {
+    for (int i = 1; i < soPhim; i++) {
+        DongThongKe dong = danhSach[i];
+        int j = i - 1;
+        while (j >= 0 && danhSach[j].soVe < dong.soVe) {
+            danhSach[j + 1] = danhSach[j];
+            j--;
+        }
+        danhSach[j + 1] = dong;
+    }
+}
+
+// Lượt 2: gom dòng hiển thị và tên phim đồng hạng, sau đó sắp mảng và in.
+void inPhimTheoThongKe(NodePhim* head, const ThongKePhim& thongKe) {
+    printf("\n%-8s %-40s %-12s %10s %20s\n",
+           "Ma", "Ten phim", "Ve da dat", "Lap day", "Doanh thu (VND)");
+    cout << string(104, '-') << '\n';
+    string phimNhieuVe, phimItVe, phimDoanhThuCao, phimDoanhThuThap;
+    DongThongKe* danhSach = new DongThongKe[thongKe.tongPhim];
+    int soPhim = 0;
+
+    NodePhim* p = head;
+    while (p != nullptr) {
+        int soVe = demVeDaDat(p->data);
+        double doanhThu = soVe * p->data.giaVe;
+        danhSach[soPhim++] = {p, soVe};
+
+        string tenPhim = p->data.ma + " - " + p->data.ten + "\n";
+        if (soVe == thongKe.veNhieuNhat) phimNhieuVe += tenPhim;
+        if (soVe == thongKe.veItNhat) phimItVe += tenPhim;
+        if (doanhThu == thongKe.doanhThuCaoNhat) phimDoanhThuCao += tenPhim;
+        if (doanhThu == thongKe.doanhThuThapNhat) phimDoanhThuThap += tenPhim;
+        p = p->next;
+    }
+
+    sapXepThongKeTheoLapDay(danhSach, soPhim);
+    for (int i = 0; i < soPhim; i++) {
+        inDongThongKe(danhSach[i].phim->data, danhSach[i].soVe);
+    }
+    delete[] danhSach;
+
+    cout << string(104, '-') << '\n';
+    cout << "\n======== TONG KET THONG KE ========\n";
+    cout << '+' << string(28, '-') << '+' << string(21, '-')
+         << '+' << string(52, '-') << "+\n";
+    printf("| %-26s | %-19s | %-50s |\n", "Tieu chi", "Gia tri", "Phim");
+    cout << '+' << string(28, '-') << '+' << string(21, '-')
+         << '+' << string(52, '-') << "+\n";
+    inHangTongKet("Tong so phim", thongKe.tongPhim, "phim", "");
+    inHangTongKet("Tong so ve dang dat", thongKe.tongVe, "ve", "");
+    inHangTongKet("Tong doanh thu tam tinh", thongKe.tongDoanhThu, "VND", "");
+    inHangTongKet("Phim dat ve nhieu nhat", thongKe.veNhieuNhat, "ve", phimNhieuVe);
+    inHangTongKet("Phim dat ve it nhat", thongKe.veItNhat, "ve", phimItVe);
+    inHangTongKet("Doanh thu cao nhat", thongKe.doanhThuCaoNhat, "VND", phimDoanhThuCao);
+    inHangTongKet("Doanh thu thap nhat", thongKe.doanhThuThapNhat, "VND", phimDoanhThuThap);
+}
+
+void hienThongKePhim(NodePhim* headPhim) {
+    if (headPhim == nullptr) {
+        cout << "[!] Danh sach phim hien dang trong, chua co du lieu thong ke!\n";
+        return;
+    }
+
+    cout << "\n======== THONG KE TINH HINH DAT VE ========\n";
+    ThongKePhim thongKe = thuThapThongKe(headPhim);
+    cout << "* Doanh thu tam tinh theo gia ve hien tai, chi tinh ve dang dat.\n";
+    cout << "* Ty le lap day = so ve dang dat / " << TONG_GHE << " x 100%.\n";
+    cout << "* Bang phim sap theo ty le lap day tu cao xuong thap.\n";
+
+    inPhimTheoThongKe(headPhim, thongKe);
+    cout << "==========================================\n";
+}
+
 // ================================================================
 // 8. MENU & ĐIỀU PHỐI HỆ THỐNG (MAIN & CONTROL FLOW)
 // ================================================================
@@ -990,6 +1290,10 @@ void hienThiMenu() {
     cout << "  6. Sap xep danh sach phim\n";
     cout << "  7. Xem so do ghe phong chieu\n";
     cout << "  8. Dat ve & Huy ve xem phim\n";
+    // Thống kê - Chức năng 11 có cột tỷ lệ lấp đầy của từng phim.
+    cout << " 11. Thong ke dat ve & Ty le lap day\n";
+    // BST - Thêm chức năng 12 vào menu chính.
+    cout << " 12. Tim kiem nhanh theo ma phim (BST)\n";
     cout << "  0. Thoat\n";
     cout << "====================================\n";
     cout << "Chon: ";
@@ -1021,15 +1325,30 @@ void khoiTaoHeThong(const string& file, NodePhim*& head, int& veKeTiep) {
 int main() {
     NodePhim* headPhim = nullptr; // Con trỏ đầu danh sách liên kết
     int veKeTiep = 1001;          // Bộ đếm mã số vé tự tăng
+    // BST - Khởi tạo cây riêng, linked list vẫn quản lý dữ liệu phim.
+    Tree root;
+    khoiTaoCay(root);
 
     // Bước 1: Khởi tạo hệ thống
     khoiTaoHeThong(FILE_DB, headPhim, veKeTiep);
+    // BST - Dựng cây sau khi dữ liệu đã được nạp vào linked list.
+    if (taoCayTuDanhSach(headPhim, root) != 1) {
+        cout << "[!] Khong tao duoc BST do ma phim trung hoac khong hop le. Chuc nang 12 chua san sang!\n";
+    }
 
     // Bước 2: Vòng lặp Menu chính
     string chon;
     while (true) {
         hienThiMenu();
         getline(cin, chon);
+
+        // BST - Liên quan chức năng 1 (thêm), 4 (xóa), 6 (sắp xếp).
+        // Xóa phim hủy node gốc; sắp xếp đổi data giữa các node.
+        // Dọn cây trước các thao tác này rồi dựng lại từ danh sách mới.
+        bool canTaoLaiCay = (chon == "1" || chon == "4" || chon == "6");
+        if (canTaoLaiCay) {
+            giaiPhongCay(root);
+        }
 
         if (chon == "1") {
             nhapDanhSachPhim(headPhim);
@@ -1077,6 +1396,14 @@ int main() {
         else if (chon == "8") {
             hienMenuDatVeHuyVe(headPhim, veKeTiep);
         }
+        else if (chon == "12") {
+            // BST - Điều phối chức năng 12: tìm kiếm nhanh theo mã phim.
+            hienMenuTimKiemNhanh(root);
+        }
+        else if (chon == "11") {
+            // Thống kê - Đọc trạng thái ghế hiện tại từ linked list.
+            hienThongKePhim(headPhim);
+        }
         else if (chon == "0") {
             ghiToanBoFile(FILE_DB, headPhim);
             cout << "Da dong bo du lieu an toan xuong dia. Tam biet!\n";
@@ -1085,9 +1412,16 @@ int main() {
         else {
             cout << "[!] Lua chon khong hop le, vui long chon lai!\n";
         }
+
+        // BST - Dựng lại cây sau chức năng 1, 4, 6 để khớp linked list hiện tại.
+        if (canTaoLaiCay && taoCayTuDanhSach(headPhim, root) != 1) {
+            cout << "[!] Khong tao duoc BST do ma phim trung hoac khong hop le. Chuc nang 12 chua san sang!\n";
+        }
     }
 
     // Bước 3: Giải phóng bộ nhớ RAM trước khi thoát
+    // BST - Giải phóng cây trước khi xóa các node phim của linked list.
+    giaiPhongCay(root);
     giaiPhong(headPhim);
 
     return 0;

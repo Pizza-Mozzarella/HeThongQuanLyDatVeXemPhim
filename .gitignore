@@ -10,5 +10,4 @@ README_2.md
 *.docx
 *.exe
 MAU_BAO_CAO_TIEU_LUAN.md
-*.py
-ignore
+history.txt
